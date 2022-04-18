@@ -14,6 +14,8 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
 
             # Loading channels.
             channels = D.get_guild_channels(client, guild)
+
+            # By default, 4 channels are created automatically
             @test length(channels) == 4
             @test map(ch -> (ch.type, ch.name), channels) == [
                 (D.ChannelType.GUILD_CATEGORY, "Text Channels"),
@@ -26,16 +28,17 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             text_general = channels[3]
             channel = D.create_guild_channel(client, guild; name="test")
             D.update_guild_channel_positions(client, guild; positions=[
-                (; id=text_general.id, position=channel.position),
-                (; id=channel.id, position=text_general.position),
+                (; id=text_general.id, position=5),
+                (; id=channel.id, position=3),
             ])
-            @test D.get_channel(client, text_general.id).position == channel.position
-            @test D.get_channel(client, channel.id).position == text_general.position
+            @test D.get_channel(client, text_general.id).position == 5
+            @test D.get_channel(client, channel.id).position == 3
 
             # Update + delete channel.
             channel = D.update_channel(client, channel; name="test2")
             @test channel.name == "test2"
             D.delete_channel(client, channel)
+            @test length(D.get_guild_channels(client, guild)) == 4
 
             # Create + get messages.
             channel = text_general
@@ -45,18 +48,19 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test D.get_channel_message(client, channel, message).id == message.id
             messages = D.get_channel_messages(client, channel)
             @test length(messages) == 1 && messages[1].id == message.id
-            @test messages[1].timestamp isa DateTime
+            @test length(messages) == 1 && messages[1].id == message.id
 
-            # Creating, listing, deleting reactions.
+            # Creating, listing, deleting individual reactions.
             D.create_reaction(client, channel, message, UP)
             users = D.get_reactions(client, channel, message, UP)
             @test length(users) == 1 && users[1].id == user.id
+            @test length(D.get_reactions(client, channel, message, UP)) == 1
             D.delete_reaction(client, channel, message, UP)
+            @test isempty(D.get_reactions(client, channel, message, UP))
+
+            # Delete all reactions
             D.create_reaction(client, channel, message, UP)
             D.create_reaction(client, channel, message, DOWN)
-            D.delete_all_reactions(client, channel, message, UP)
-            @test isempty(D.get_reactions(client, channel, message, UP))
-            @test !isempty(D.get_reactions(client, channel, message, DOWN))
             D.delete_all_reactions(client, channel, message)
             @test isempty(D.get_reactions(client, channel, message, DOWN))
 
@@ -64,6 +68,8 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test D.update_message(client, channel, message; content="a").content == "a"
             D.delete_message(client, channel, message)
             @test isempty(D.get_channel_messages(client, channel))
+
+            # Create and delete multiple messages
             ids = map(i -> D.create_message(client, channel; content="hi").id, 1:5)
             @test length(D.get_channel_messages(client, channel)) == 5
             D.delete_messages(client, channel; messages=ids)
@@ -91,18 +97,20 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test length(pins) == 1 && pins[1].id == message.id
             D.delete_pinned_channel_message(client, channel, message)
             @test isempty(D.get_pinned_messages(client, channel))
+            D.delete_message(client, channel, message)
 
             # Emojis.
             @test isempty(D.get_guild_emojis(client, guild))
             # TODO: Figure out how to properly send the payload.
-            # png = read(joinpath(@__DIR__, "emoji.png"), String)
-            # emoji = D.create_guild_emoji(client, guild; name="test", image=png)
-            # emojis = D.get_guild_emojis(client, guild)
-            # @test length(emojis) == 1 && emojis[1].id == emoji.id
+            image_data = read(joinpath(@__DIR__, "emoji.png")) |> base64encode
+            image_encoded = "data:image/jpeg;base64,$image_data"
+            emoji = D.create_guild_emoji(client, guild; name="test", image=image_encoded)
+            emojis = D.get_guild_emojis(client, guild)
+            @test length(emojis) == 1 && emojis[1].id == emoji.id
             # @test D.update_guild_emoji(client, guild, emoji; name="test2").name == "test2"
             # @test D.get_guild_emoji(client, guild, emoji).name == "test2"
-            # D.delete_guild_emoji(client, guild, emoji)
-            # @test isempty(D.get_guild_emojis(client, guild))
+            D.delete_guild_emoji(client, guild, emoji)
+            @test isempty(D.get_guild_emojis(client, guild))
 
             # Guilds/members.
             @test D.get_guild(client, guild).id == guild.id
@@ -147,11 +155,14 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test isempty(D.get_channel_webhooks(client, channel))
             @test isempty(D.get_guild_webhooks(client, guild))
 
+            # This may return some integrations even for the test guild because some bots
+            # may be already attached to the Discord server.
+            @test_nowarn D.get_guild_integrations(client, guild)
+
             # Misc.
             @test eltype(D.get_guild_voice_regions(client, guild)) === D.VoiceRegion
             @test eltype(D.get_voice_regions(client)) === D.VoiceRegion
             @test isempty(D.get_guild_bans(client, guild))
-            @test isempty(D.get_guild_integrations(client, guild))
             @test D.get_guild_prune_count(client, guild).pruned == 0
             @test !D.get_guild_widget(client, guild).enabled
         finally

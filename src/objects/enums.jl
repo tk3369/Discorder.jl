@@ -174,7 +174,7 @@ end or=true
 end or=true
 
 # TODO: 64-bit (SuperEnum#10).
-@discord_enum Permissions#=::Int64=# begin
+@discord_enum PermissionBitmasks#=::Int64=# begin
     CREATE_INSTANT_INVITE = 0x00000001
     KICK_MEMBERS = 0x00000002
     BAN_MEMBERS = 0x00000004

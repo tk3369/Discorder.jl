@@ -4,7 +4,7 @@ struct ArrayBody{T}
 end
 
 JSON3.write(kw::Pairs{Symbol, ArrayBody{T}, Tuple{Symbol}, NamedTuple{(:array,), Tuple{ArrayBody{T}}}}) where T =
-    JSON3.write(kw.data.array.xs)
+    JSON3.write(values(kw).array.xs)
 
 function api_call(c, method, path, Into=Nothing, params=Dict();  kwargs...)
     @debug "$method $path"
@@ -62,13 +62,34 @@ function parse_response(resp::Response, Into)
     return if resp.status == 204
         nothing
     elseif header(resp, "Content-Type") == "application/json"
-        x = JSON3.read(resp.body, Into)
+        x = try_parse_json(resp.body, Into)
         fix_datetimes!(x)
         x
     else
         resp.body
     end
 end
+
+function try_parse_json(response::Vector{UInt8}, Into)
+    str = String(response)
+    @debug "Parsing: $str"
+    try
+        return JSON3.read(str, Into)
+    catch e
+        @error "Unable to parse response: $e"
+        println(str)
+        rethrow(e)
+    end
+end
+
+# I hate this lol
+# function fix_permissions!(x::T) where T
+#     for name in fieldnames(T)
+#         if name == :permissions && fieldtype(T, name) >: Union{String,UInt64}
+#             setfield!(x, name, parse(UInt64, getfield(x, name)))
+#         end
+#     end
+# end
 
 # I hate this.
 parse_datetime(s) = DateTime(replace(s, "+" => ".000+")[1:23], ISODateTimeFormat)
@@ -230,7 +251,7 @@ RESOURCE[] = "emoji"
 @route get_guild_emojis GET "/guilds/$guild/emojis" Vector{Emoji}
 @route get_guild_emoji GET "/guilds/$guild/emojis/$emoji_id" Emoji
 @route create_guild_emoji POST "/guilds/$guild/emojis" Emoji kwargs
-@route update_guild_emoji PATCH "/guilds/$guild/emojis" Emoji kwargs
+@route update_guild_emoji PATCH "/guilds/$guild/emojis/$emoji_id" Emoji kwargs
 @route delete_guild_emoji DELETE "/guilds/$guild/emojis/$emoji_id"
 
 RESOURCE[] = "guild"

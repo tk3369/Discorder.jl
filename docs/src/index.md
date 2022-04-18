@@ -1,12 +1,12 @@
 ```@meta
-CurrentModule = Discord
+CurrentModule = Discorder
 ```
 
-# Discord
+# Discorder
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [Discord]
+Modules = [Discorder]
 ```

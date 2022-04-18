@@ -1,14 +1,13 @@
-using Discord
+using Discorder
 using Documenter
 
 makedocs(;
-    modules=[Discord],
-    authors="Chris de Graaf <me@cdg.dev> and contributors",
-    repo="https://github.com/christopher-dG/Discord.jl/blob/{commit}{path}#L{line}",
-    sitename="Discord.jl",
+    modules=[Discorder],
+    authors="Chris de Graaf <me@cdg.dev>, Tom Kwong <tk3369@gmail.com> and contributors",
+    repo="https://github.com/tk3369/Discorder.jl/blob/{commit}{path}#L{line}",
+    sitename="Discorder.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://docs.cdg.dev/Discord.jl",
         assets=String[],
     ),
     pages=[
@@ -17,5 +16,5 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/christopher-dG/Discord.jl",
+    repo="github.com/tk3369/Discorder.jl",
 )

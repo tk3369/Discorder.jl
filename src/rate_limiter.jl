@@ -33,7 +33,7 @@ on_rate_limit(::Val{SENTINEL}, reset, resp) = RATE_LIMIT_SENTINEL
 on_rate_limit(::Val{THROW}, reset, resp) = throw(RateLimitedError(reset, resp))
 function on_rate_limit(::Val{WAIT}, reset, resp)
     interval = max(Millisecond(0), reset - now(UTC))
-    @info "Rate limited, waiting for $interval"
+    @debug "Rate limited, waiting for $interval"
     sleep(interval)
     return RATE_LIMIT_RETRY
 end

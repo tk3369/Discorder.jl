@@ -4,7 +4,7 @@
     color::Int
     hoist::Bool
     position::Int
-    permissions::Int64
+    permissions::Permissions
     managed::Bool
     mentionable::Bool
 end
