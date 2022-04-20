@@ -1,3 +1,8 @@
+# Define a custom type for JSON parsing reason. The specific scenario is when
+# a field is specified explicitly as `null` in the JSON string. The default behavior
+# of JSON3 parser keeps `missing` for a Union{T,Nothing,Missing} field; but in that
+# case, we actually want `nothing` rather than `missing`. Adding a new custom type
+# A.Null works around that problem.
 module A
 struct Null end
 end
@@ -7,6 +12,11 @@ StructTypes.construct(::Type{A.Null}, ::Nothing) = nothing
 Base.convert(::Type{Union{A.Null, Snowflake}}, s::AbstractString) = Snowflake(s)
 Base.convert(::Type{Union{A.Null, Snowflake}}, n::Integer) = Snowflake(n)
 
+"""
+Convert object to JSON formatted string.
+- Fields with `missing` values are excluded.
+- Fields with `nothing` values are included as `null`.
+"""
 function json(x)
     data = Dict{Symbol, Any}()
     for name in propertynames(x)
@@ -18,6 +28,9 @@ function json(x)
     return JSON3.write(data)
 end
 
+"""
+Define a Discord resource.
+"""
 macro discord_object(typedef)
     # Make the type mutable.
     typedef.args[1] = true
@@ -27,6 +40,11 @@ macro discord_object(typedef)
     for (i, field) in enumerate(fields)
         if field isa Expr
             type = field.args[2]
+            # TODO Discord API describes nullable, optional, and nullable & optional fields.
+            # We might want to consider mapping it more accurately:
+            # 1. Nullable: Union{T, A.Null, Nothing}
+            # 2. Optional: Union{T, Missing}
+            # 3. Nulllable and optional: Union{T, A.Null, Nothing, Missing}
             field.args[2] = :(Union{$type, A.Null, Nothing, Missing})
             fields[i] = :($field = missing)
         end
