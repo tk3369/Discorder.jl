@@ -164,7 +164,6 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test eltype(D.get_voice_regions(client)) === D.VoiceRegion
             @test isempty(D.get_guild_bans(client, guild))
             @test D.get_guild_prune_count(client, guild).pruned == 0
-            @test !D.get_guild_widget(client, guild).enabled
         finally
             D.delete_guild(client, guild)
         end

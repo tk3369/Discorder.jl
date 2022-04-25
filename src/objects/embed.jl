@@ -1,3 +1,4 @@
+# https://discord.com/developers/docs/resources/channel#embed-object-embed-structure
 @discord_object struct Embed
     title::String
     type::String

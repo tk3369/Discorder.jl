@@ -9,8 +9,6 @@ end
 
 StructTypes.StructType(::Type{A.Null}) = StructTypes.NullType()
 StructTypes.construct(::Type{A.Null}, ::Nothing) = nothing
-Base.convert(::Type{Union{A.Null, Snowflake}}, s::AbstractString) = Snowflake(s)
-Base.convert(::Type{Union{A.Null, Snowflake}}, n::Integer) = Snowflake(n)
 
 """
 Convert object to JSON formatted string.
@@ -66,26 +64,34 @@ macro discord_object(typedef)
 end
 
 macro discord_enum(name, block, kwargs...)
-    # TODO: Why do I need to eval here? I want to just insert a macrocall expression.
-    @eval @se $name $block
+    if name isa Expr
+        name.head == :(::) || throw(ArgumentError("Bug: enum express must be like <name>::<type>"))
+        base_type = name.args[2]
+        name = name.args[1]
+    else
+        base_type = Symbol(Int32)   # default base type for enums
+    end
 
     exp = :(export $(esc(name)))
-    name = Expr(:., name, QuoteNode(Symbol(name, :Enum)))
+    enum_name = Expr(:., name, QuoteNode(Symbol("T")))
 
     extras = Expr(:block)
     for ex in kwargs
         k, v = ex.args
         if v === true
             if k === :or
-                or = :(Base.:(|)(a::$(esc(name)), b::$(esc(name))) = Int(a) | Int(b))
+                or = :(Base.:(|)(a::$(esc(enum_name)), b::$(esc(enum_name))) = Int(a) | Int(b))
                 push!(extras.args, or)
             end
         end
     end
 
+    name_sym = Expr(:(::), name, base_type)
+    Base.eval(__module__, :(@enumx $name_sym $block))
+
     return quote
-        StructTypes.StructType(::Type{$(esc(name))}) = StructTypes.NumberType()
-        StructTypes.numbertype(::Type{$(esc(name))}) = Int
+        StructTypes.StructType(::Type{$(esc(enum_name))}) = StructTypes.NumberType()
+        StructTypes.numbertype(::Type{$(esc(enum_name))}) = Int
         $exp
         $extras
     end
@@ -94,9 +100,12 @@ end
 include(joinpath("objects", "enums.jl"))
 include(joinpath("objects", "user.jl"))
 include(joinpath("objects", "integration_account.jl"))
+include(joinpath("objects", "integration_application.jl"))
 include(joinpath("objects", "integration.jl"))
 include(joinpath("objects", "connection.jl"))
 include(joinpath("objects", "overwrite.jl"))
+include(joinpath("objects", "thread_metadata.jl"))
+include(joinpath("objects", "thread_member.jl"))
 include(joinpath("objects", "channel.jl"))
 include(joinpath("objects", "channel_mention.jl"))
 include(joinpath("objects", "guild_member.jl"))
@@ -112,28 +121,40 @@ include(joinpath("objects", "embed.jl"))
 include(joinpath("objects", "emoji.jl"))
 include(joinpath("objects", "reaction.jl"))
 include(joinpath("objects", "message_activity.jl"))
-include(joinpath("objects", "message_application.jl"))
+include(joinpath("objects", "team_member.jl"))
+include(joinpath("objects", "team.jl"))
+include(joinpath("objects", "install_params.jl"))
+include(joinpath("objects", "application.jl"))
 include(joinpath("objects", "message_reference.jl"))
 include(joinpath("objects", "message.jl"))
+include(joinpath("objects", "role_tags.jl"))
 include(joinpath("objects", "role.jl"))
 include(joinpath("objects", "voice_state.jl"))
 include(joinpath("objects", "activity_timestamps.jl"))
-include(joinpath("objects", "activity_emoji.jl"))
+include(joinpath("objects", "party_size.jl"))
 include(joinpath("objects", "activity_party.jl"))
 include(joinpath("objects", "activity_assets.jl"))
 include(joinpath("objects", "activity_secrets.jl"))
 include(joinpath("objects", "activity.jl"))
 include(joinpath("objects", "client_status.jl"))
-include(joinpath("objects", "presence.jl"))
-include(joinpath("objects", "guild.jl"))
+include(joinpath("objects", "presence_update_event.jl"))
+include(joinpath("objects", "welcome_screen_channel.jl"))
+include(joinpath("objects", "welcome_screen.jl"))
+include(joinpath("objects", "sticker.jl"))
+include(joinpath("objects", "stage_instance.jl"))
+include(joinpath("objects", "guild_scheduled_event_entity_metadata.jl"))
+include(joinpath("objects", "guild_scheduled_event.jl"))
+include(joinpath("objects", "guild_widget_settings.jl"))
 include(joinpath("objects", "guild_widget.jl"))
+include(joinpath("objects", "guild.jl"))
 include(joinpath("objects", "webhook.jl"))
 include(joinpath("objects", "audit_log_change.jl"))
-include(joinpath("objects", "audit_log_info.jl"))
+include(joinpath("objects", "optional_audit_entry_info.jl"))
 include(joinpath("objects", "audit_log_entry.jl"))
 include(joinpath("objects", "audit_log.jl"))
 include(joinpath("objects", "allowed_mentions.jl"))
 include(joinpath("objects", "ban.jl"))
+include(joinpath("objects", "invite_stage_instance.jl"))
 include(joinpath("objects", "invite.jl"))
 include(joinpath("objects", "voice_region.jl"))
 include(joinpath("objects", "prune_count.jl"))

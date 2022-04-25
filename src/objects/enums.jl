@@ -1,19 +1,24 @@
+# https://discord.com/developers/docs/resources/user#user-object-premium-types
 @discord_enum UserPremiumType begin
     NONE = 0
     NITRO_CLASSIC = 1
     NITRO = 2
 end
 
+# https://discord.com/developers/docs/resources/guild#integration-object-integration-expire-behaviors
 @discord_enum IntegrationExpireBehavior begin
     REMOVE_ROLE = 0
     KICK = 1
 end
 
+# https://discord.com/developers/docs/resources/user#connection-object-visibility-types
 @discord_enum ConnectionVisibility begin
     NONE = 0
     EVERYONE = 1
 end
 
+# https://discord.com/developers/docs/resources/channel#channel-object-channel-types
+# Type 10, 11 and 12 are only available in API v9.
 @discord_enum ChannelType begin
     GUILD_TEXT = 0
     DM = 1
@@ -21,9 +26,17 @@ end
     GROUP_DM = 3
     GUILD_CATEGORY = 4
     GUILD_NEWS = 5
-    GUILD_STORE = 6
+    GUILD_NEWS_THREAD = 10
+    GUILD_PUBLIC_THREAD = 11
+    GUILD_PRIVATE_THREAD = 12
+    GUILD_STAGE_VOICE = 13
+    GUILD_DIRECTORY = 14
+    GUILD_FORUM = 15
 end
 
+# https://discord.com/developers/docs/resources/channel#message-object-message-types
+# Type 19 and 20 are only in API v8. In v6, they are still type 0.
+# Type 21 is only in API v9.
 @discord_enum MessageType begin
     DEFAULT = 0
     RECIPIENT_ADD = 1
@@ -40,8 +53,17 @@ end
     CHANNEL_FOLLOW_ADD = 12
     GUILD_DISCOVERY_DISQUALIFIED = 14
     GUILD_DISCOVERY_REQUALIFIED = 15
+    GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING = 16
+    GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17
+    THREAD_CREATED = 18
+    REPLY = 19
+    CHAT_INPUT_COMMAND = 20
+    THREAD_STARTER_MESSAGE = 21
+    GUILD_INVITE_REMINDER = 22
+    CONTEXT_MENU_COMMAND = 23
 end
 
+# https://discord.com/developers/docs/resources/channel#message-object-message-activity-types
 @discord_enum MessageActivityType begin
     JOIN = 1
     SPECTATE = 2
@@ -49,6 +71,7 @@ end
     JOIN_REQUEST = 5
 end
 
+# https://discord.com/developers/docs/resources/guild#guild-object-verification-level
 @discord_enum VerificationLevel begin
     NONE = 0
     LOW = 1
@@ -57,22 +80,26 @@ end
     VERY_HIGH = 4
 end
 
+# https://discord.com/developers/docs/resources/guild#guild-object-default-message-notification-level
 @discord_enum MessageNotificationsLevel begin
     ALL_MESSAGES = 0
     ONLY_MENTIONS = 1
 end
 
+# https://discord.com/developers/docs/resources/guild#guild-object-explicit-content-filter-level
 @discord_enum ExplicitContentFilter begin
     DISABLED = 0
     MEMBERS_WITHOUT_ROLES = 1
     ALL_MEMBERS = 2
 end
 
+# https://discord.com/developers/docs/resources/guild#guild-object-mfa-level
 @discord_enum MFALevel begin
     NONE = 0
     ELEVATED = 1
 end
 
+# https://discord.com/developers/docs/resources/guild#guild-object-premium-tier
 @discord_enum PremiumTier begin
     NONE = 0
     TIER_1 = 1
@@ -80,18 +107,32 @@ end
     TIER_3 = 3
 end
 
-@discord_enum ActivityType begin
-    GAME = 0
-    STREAMING = 1
-    LISTENING = 2
-    CUSTOM = 3
+# https://discord.com/developers/docs/resources/guild#guild-object-guild-nsfw-level
+@discord_enum GuildNSFWLevel begin
+    DEFAULT = 0
+    EXPLICIT = 1
+    SAFE = 2
+    AGE_RESTRICTED = 3
 end
 
+# https://discord.com/developers/docs/game-sdk/activities#data-models-activitytype-enum
+@discord_enum ActivityType begin
+    PLAYING = 0
+    STREAMING = 1
+    LISTENING = 2
+    WATCHING = 3
+    CUSTOM = 4
+    COMPETING = 5
+end
+
+# https://discord.com/developers/docs/resources/webhook#webhook-object-webhook-types
 @discord_enum WebhookType begin
     INCOMING = 1
     CHANNEL_FOLLOWER = 2
+    APPLICATION = 3
 end
 
+# https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-audit-log-events
 @discord_enum AuditLogEvent begin
     GUILD_UPDATE = 1
     CHANNEL_CREATE = 10
@@ -128,53 +169,124 @@ end
     INTEGRATION_CREATE = 80
     INTEGRATION_UPDATE = 81
     INTEGRATION_DELETE = 82
+    STAGE_INSTANCE_CREATE = 83
+    STAGE_INSTANCE_UPDATE = 84
+    STAGE_INSTANCE_DELETE = 85
+    STICKER_CREATE = 90
+    STICKER_UPDATE = 91
+    STICKER_DELETE = 92
+    GUILD_SCHEDULED_EVENT_CREATE = 100
+    GUILD_SCHEDULED_EVENT_UPDATE = 101
+    GUILD_SCHEDULED_EVENT_DELETE = 102
+    THREAD_CREATE = 110
+    THREAD_UPDATE = 111
+    THREAD_DELETE = 112
 end
 
-@discord_enum TargetUserType begin
+# https://discord.com/developers/docs/resources/invite#invite-object-invite-target-types
+@discord_enum InviteTargetType begin
     STREAM = 1
+    EMBEDDED_APPLICATION = 2
 end
 
-@discord_enum UserFlags begin
-    NONE = 0
-    DISCORD_EMPLOYEE = 1 << 0
-    DISCORD_PARTNER = 1 << 1
-    HYPESQUAD_EVENTS = 1 << 2
-    BUG_HUNTER_1 = 1 << 3
-    HOUSE_BRAVERY = 1 << 6
-    HOUSE_BRILLIANCE = 1 << 7
-    HOUSE_BALANCE = 1 << 8
-    EARLY_SUPPORTER = 1 << 9
-    TEAM_USER = 1 << 10
-    SYSTEM = 1 << 12
-    BUG_HUNTER_2 = 1 << 14
-    VERIFIED_BOT = 1 << 16
-    VERIFIED_BOT_DEVELOPER = 1 << 17
+# This is used for both GuildScheduledEvent and StageInstance objects
+# The documentation are separate and distinct, but the values seem to match.
+# So, this is defined once rather as separate enums. If the situation changes
+# in the future, then we can just split the enum.
+# https://discord.com/developers/docs/resources/guild-scheduled-event#guild-scheduled-event-object-guild-scheduled-event-privacy-level
+# https://discord.com/developers/docs/resources/stage-instance#stage-instance-object-privacy-level
+@discord_enum PrivacyLevel begin
+    PUBLIC = 1
+    GUILD_ONLY = 2
+end
+
+# https://discord.com/developers/docs/resources/guild-scheduled-event#guild-scheduled-event-object-guild-scheduled-event-status
+@discord_enum GuildScheduledEventStatus begin
+    SCHEDULED = 1
+    ACTIVE = 2
+    COMPLETED = 3
+    CANCELED = 4
+end
+
+# https://discord.com/developers/docs/resources/guild-scheduled-event#guild-scheduled-event-object-guild-scheduled-event-entity-types
+@discord_enum GuildScheduledEventEntityType begin
+    STAGE_INSTANCE = 1
+    VOICE = 2
+    EXTERNAL = 3
+end
+
+# https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-types
+@discord_enum StickerType begin
+    STANDARD = 1
+    GUILD = 2
+end
+
+# https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types
+@discord_enum StickerFormatType begin
+    PNG = 1
+    APNG = 2
+    LOTTIE = 3
+end
+
+# https://discord.com/developers/docs/topics/teams#data-models-membership-state-enum
+@discord_enum MembershipState begin
+    INVITED = 1
+    ACCEPTED = 2
+end
+
+# https://discord.com/developers/docs/resources/application#application-object-application-flags
+@discord_enum ApplicationFlags begin
+    GATEWAY_PRESENCE = 1 << 12
+    GATEWAY_PRESENCE_LIMITED = 1 << 13
+    GATEWAY_GUILD_MEMBERS = 1 << 14
+    GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15
+    VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16
+    EMBEDDED = 1 << 17
+    GATEWAY_MESSAGE_CONTENT = 1 << 18
+    GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19
 end or=true
 
+# https://discord.com/developers/docs/resources/user#user-object-user-flags
+@discord_enum UserFlags begin
+    STAFF = 1 << 0
+    PARTNER = 1 << 1
+    HYPESQUAD = 1 << 2
+    BUG_HUNTER_LEVEL_1 = 1 << 3
+    HYPESQUAD_ONLINE_HOUSE_1 = 1 << 6
+    HYPESQUAD_ONLINE_HOUSE_2 = 1 << 7
+    HYPESQUAD_ONLINE_HOUSE_3 = 1 << 8
+    PREMIUM_EARLY_SUPPORTER = 1 << 9
+    TEAM_PSEUDO_USER = 1 << 10
+    BUG_HUNTER_LEVEL_2 = 1 << 14
+    VERIFIED_BOT = 1 << 16
+    VERIFIED_DEVELOPER = 1 << 17
+    CERTIFIED_MODERATOR = 1 << 18
+    BOT_HTTP_INTERACTIONS = 1 << 19
+end or=true
+
+# https://discord.com/developers/docs/resources/channel#message-object-message-flags
 @discord_enum MessageFlags begin
     CROSSPOSTED = 1 << 0
     IS_CROSSPOST = 1 << 1
     SUPPRESS_EMBEDS = 1 << 2
     SOURCE_MESSAGE_DELETED = 1 << 3
     URGENT = 1 << 4
+    HAS_THREAD = 1 << 5
+    EPHEMERAL = 1 << 6
+    LOADING = 1 << 7
+    FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
 end or=true
 
+# https://discord.com/developers/docs/resources/guild#guild-object-system-channel-flags
 @discord_enum SystemChannelFlags begin
     SUPPRESS_JOIN_NOTIFICATIONS = 1 << 0
     SUPPRESS_PREMIUM_SUBSCRIPTIONS = 1 << 1
+    SUPPRESS_GUILD_REMINDER_NOTIFICATIONS = 1 << 2
+    SUPPRESS_JOIN_NOTIFICATION_REPLIES = 1 << 3
 end or=true
 
-@discord_enum ActivityFlags begin
-    INSTANCE = 1 << 0
-    JOIN = 1 << 1
-    SPECTATE = 1 << 2
-    JOIN_REQUEST = 1 << 3
-    SYNC = 1 << 4
-    PLAY = 1 << 5
-end or=true
-
-# TODO: 64-bit (SuperEnum#10).
-@discord_enum PermissionBitmasks#=::Int64=# begin
+# https://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags
+@discord_enum PermissionBitmasks::Int64 begin
     CREATE_INSTANT_INVITE = 0x00000001
     KICK_MEMBERS = 0x00000002
     BAN_MEMBERS = 0x00000004
@@ -205,5 +317,15 @@ end or=true
     MANAGE_NICKNAMES = 0x08000000
     MANAGE_ROLES = 0x10000000
     MANAGE_WEBHOOKS = 0x20000000
-    MANAGE_EMOJIS = 0x40000000
+    MANAGE_EMOJIS_AND_STICKERS = 0x40000000
+    USE_APPLICATION_COMMANDS = 0x0000000080000000
+    REQUEST_TO_SPEAK = 0x0000000100000000
+    MANAGE_EVENTS = 0x0000000200000000
+    MANAGE_THREADS = 0x0000000400000000
+    CREATE_PUBLIC_THREADS = 0x0000000800000000
+    CREATE_PRIVATE_THREADS = 0x0000001000000000
+    USE_EXTERNAL_STICKERS = 0x0000002000000000
+    SEND_MESSAGES_IN_THREADS = 0x0000004000000000
+    USE_EMBEDDED_ACTIVITIES = 0x0000008000000000
+    MODERATE_MEMBERS = 0x0000010000000000
 end

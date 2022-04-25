@@ -1,16 +1,12 @@
+# https://discord.com/developers/docs/game-sdk/activities#data-models-activity-struct
 @discord_object struct Activity
+    application_id::Int
     name::String
-    type::ActivityType.ActivityTypeEnum
-    url::String
-    created_at::Union{Int, DateTime}
-    timestamps::ActivityTimestamps
-    application_id::Snowflake
-    details::String
     state::String
-    emoji::ActivityEmoji
-    party::ActivityParty
+    details::String
+    timestamps::ActivityTimestamps
     assets::ActivityAssets
+    party::ActivityParty
     secrets::ActivitySecrets
     instance::Bool
-    flags::Int64
 end

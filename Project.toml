@@ -1,21 +1,21 @@
 name = "Discorder"
 uuid = "c6a91ba0-1c40-48b6-bd49-67c5ab335442"
 authors = ["Chris de Graaf <me@cdg.dev>, Tom Kwong <tk3369@gmail.com> and Contributors"]
-version = "0.2"
+version = "0.2.0"
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
-SuperEnum = "5c958174-e7d9-5990-9618-4567de4ba542"
 
 [compat]
+EnumX = "1"
 HTTP = "0.9"
 JSON3 = "1"
 Parameters = "0.12"
-SuperEnum = "0.1"
 julia = "1"
 
 [extras]

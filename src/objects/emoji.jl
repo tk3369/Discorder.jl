@@ -1,3 +1,4 @@
+# https://discord.com/developers/docs/resources/emoji#emoji-object-emoji-structure
 @discord_object struct Emoji
     id::Snowflake
     name::String

@@ -1,3 +1,4 @@
+# https://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure
 @discord_object struct EmbedAuthor
     name::String
     url::String

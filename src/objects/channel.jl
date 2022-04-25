@@ -1,6 +1,7 @@
+# https://discord.com/developers/docs/resources/channel#channel-object-channel-structure
 @discord_object struct DiscordChannel
     id::Snowflake
-    type::ChannelType.ChannelTypeEnum
+    type::ChannelType.T
     guild_id::Snowflake
     position::Int
     permission_overwrites::Vector{Overwrite}
@@ -17,4 +18,13 @@
     application_id::Snowflake
     parent_id::Snowflake
     last_pin_timestamp::Union{String, DateTime}
+    rtc_region::String
+    video_quality_mode::Int
+    message_count::Int
+    member_count::Int
+    thread_metadata::ThreadMetadata
+    thread_member::ThreadMember
+    default_auto_archive_duration::Int
+    permissions::Permissions
+    flags::Int
 end
