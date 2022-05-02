@@ -2,14 +2,16 @@ module Discorder
 
 using Base.Iterators: Pairs
 
-using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year
+using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
+using Logging: Logging, ConsoleLogger, with_logger
 
 using EnumX: @enumx
 using HTTP: HTTP, Form, Response, StatusError, escapeuri, header, request
 using JSON3: JSON3, StructTypes
+using LoggingExtras: TransformerLogger
 using Parameters: @with_kw
-using LoggingFacilities: TimestampTransformerLogger, BeginningMessageLocation,
-    current_logger, with_logger
+using TimeZones: localzone
+
 
 const API_BASE = "https://discord.com/api"
 const API_VERSION = 9

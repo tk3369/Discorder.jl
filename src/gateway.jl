@@ -6,34 +6,15 @@ include("gateway/payload.jl")
 
 const Optional{T} = Union{T,Nothing}
 
-# Control plane request/response
-
-abstract type AbstractControlRequest end
-struct StartHeartbeatControlRequest <: AbstractControlRequest end
-struct StopHeartbeatControlRequest <: AbstractControlRequest end
-
-struct StartProcessorControlRequest <: AbstractControlRequest end
-struct StopProcessControlRequest <: AbstractControlRequest end
-
-abstract type AbstractControlResponse end
-
-@enumx ControlResult OK FAILED
-struct GeneralControlResponse <: AbstractControlResponse
-    result::ControlResult.T
-end
-
 # Gateway tracker
 @with_kw mutable struct GatewayTracker
     websocket::HTTP.WebSockets.WebSocket
     heartbeat_interval_ms::Int
-    seq::Int
+    seq::Int = -1
     heartbeat_task::Optional{Task} = nothing
     processor_task::Optional{Task} = nothing
-    controller_task::Optional{Task} = nothing
     master_task::Optional{Task} = nothing
     doctor_task::Optional{Task} = nothing
-    cin::Channel{AbstractControlRequest}
-    cout::Channel{AbstractControlResponse}
     terminate_flag::Bool = false
 end
 
@@ -41,22 +22,26 @@ struct GatewayError <: Exception
     message::String
 end
 
+function get_logger(debug::Bool)
+    timestamp_logger(logger) = TransformerLogger(logger) do log
+        current_time = now(localzone())
+        merge(log, (; message = "$current_time $(log.message)"))
+    end
+    level = debug ? Logging.Debug : Logging.Info
+    return timestamp_logger(ConsoleLogger(stdout, level))
+end
 
-function timed_logger()
-    return TimestampTransformerLogger(
-        current_logger(), BeginningMessageLocation();
-        format = "yyyy-mm-dd HH:MM:SSz"
-    )
+function show_error(ex::Exception)
+    Base.showerror(stderr, ex, Base.catch_backtrace())
 end
 
 # ---------------------------------------------------------------------------
 # Control plane
 #
 # The control plane consists of the following async processes:
-# 1. Controller: process external commands
-# 2. Heartbeat: send heartbeat messages regularly to Discord gateway
-# 3. Processor: receive and dispatch messages from Discord gateway
-# 4. Doctor: monitor the health of the control plane and stop it when it's unhealthy
+# 1. Heartbeat: send heartbeat messages regularly to Discord gateway
+# 2. Processor: receive and dispatch messages from Discord gateway
+# 3. Doctor: monitor the health of the control plane and stop it when it's unhealthy
 #
 # The `run_control_plane` function starts a new control plane and wait for it to
 # finish in a loop. Hence, if the doctor has diagnosed problems and stopped it,
@@ -70,64 +55,82 @@ Start new control plane and return a `GatewayTracker` object.
 """
 function start_control_plane(client::BotClient)
     local tracker
-    with_logger(timed_logger()) do
-        tracker_ready = Condition()
-        task = @async begin
-            gateway = get_gateway(client)
-            url = "$(gateway.url)?v=$API_VERSION&encoding=json"
-            @info "Connecting to gateway" url
-            HTTP.WebSockets.open(url) do websocket
-                json = readavailable(websocket)
-                @debug "Received" json
-                isempty(json) && throw(GatewayError("No data was received"))
+    tracker_ready = Condition()
+    task = @async try
+        gateway = get_gateway(client)
+        url = "$(gateway.url)?v=$API_VERSION&encoding=json"
+        @info "Connecting to gateway" url
+        HTTP.WebSockets.open(url) do websocket
+            json = readavailable(websocket)
+            @debug "Received" json
+            isempty(json) && throw(GatewayError("No data was received"))
 
-                payload = JSON3.read(json, GatewayPayload)
-                @info "Parsed" payload.op payload.d
-                payload.op == GatewayOpcode.Hello || throw(GatewayError("Wrong opcode: $(payload.op)"))
+            payload = JSON3.read(json, GatewayPayload)
+            @debug "Parsed" payload.op payload.d
+            payload.op == GatewayOpcode.Hello || throw(GatewayError("Wrong opcode: $(payload.op)"))
 
-                heartbeat_interval_ms = payload.d["heartbeat_interval"]
-                seq = -1
-                cin = Channel{AbstractControlRequest}(10)
-                cout = Channel{AbstractControlResponse}(10)
-                tracker = GatewayTracker(; websocket, heartbeat_interval_ms, seq, cin, cout)
+            heartbeat_interval_ms = payload.d["heartbeat_interval"]
+            tracker = GatewayTracker(; websocket, heartbeat_interval_ms)
+            notify(tracker_ready)
 
-                notify(tracker_ready)
+            @debug "Starting heartbeat and processor tasks"
+            start_heartbeat(tracker)
+            start_processor(tracker)
 
-                # Cannot exit this block or else the websocket would be closed
-                # Let's just wait for the controller task which is supposed to be long running
-                wait(start_controller(tracker))
-            end
+            @debug "Waiting for heartbeat and processor tasks"
+            wait(tracker.heartbeat_task)
+            wait(tracker.heartbeat_task)
+
+            @info "Finished control plane process"
         end
+    catch ex
+        @error "Unable to start control plane (phase 1): $ex"
+        show_error(ex)
+    end
+
+    try
+        @debug "Waiting for tracker to be ready"
         wait(tracker_ready)
+        @debug "Tracker is ready"
+
         tracker.master_task = task
 
-        # start necessary sub tasks
-        start_heartbeat(tracker)
-        start_processor(tracker)
-
         # make sure everything is up and running before starting doctor process
+        @debug "Waiting for heartbeat task to get started"
         wait_for_task_to_get_scheduled(tracker.heartbeat_task)
+
+        @debug "Waiting for processor task to get started"
         wait_for_task_to_get_scheduled(tracker.processor_task)
-        wait_for_task_to_get_scheduled(tracker.controller_task)
+
+        @debug "Starting doctor task_field"
         start_doctor(tracker)
+        wait_for_task_to_get_scheduled(tracker.doctor_task)
+
+        @info "Control plane started successfully" tracker
+    catch ex
+        @error "Unable to start control plane (phase 2): $ex"
+        show_error(ex)
     end
     return tracker
 end
 
 # Run control plane in a loop so that we can actually auto-recover
-function run_control_plane(client::BotClient, tracker_ref = Ref{GatewayTracker}())
-    while true
-        @info "Starting a new control plane"
-        tracker_ref[] = start_control_plane(client)
-        wait(tracker_ref[].master_task)
-        tracker_ref[].terminate_flag && break
+function run_control_plane(client::BotClient, tracker_ref=Ref{GatewayTracker}(); debug=true)
+    with_logger(get_logger(debug)) do
+        while true
+            @info "Starting a new control plane"
+            elapsed = @elapsed tracker_ref[] = start_control_plane(client)
+            @info "Started control plane in $elapsed seconds"
+            wait(tracker_ref[].master_task)
+            tracker_ref[].terminate_flag && break
+        end
+        @info "Control plan has been fully shut down"
     end
-    @info "Control plan has been fully shut down"
 end
 
 # The doctor is responsible for ensuring the healthiness of the control plane.
 function start_doctor(tracker::GatewayTracker)
-    tracker.doctor_task = @async begin
+    tracker.doctor_task = @async try
         while true
             if !is_operational(tracker)
                 @info "Gateway is not healthy, stopping control plane" tracker
@@ -136,6 +139,9 @@ function start_doctor(tracker::GatewayTracker)
             end
             sleep(1)
         end
+    catch ex
+        @error "Unexpected exception in doctor task: $ex"
+        show_error(ex)
     end
     return tracker.doctor_task
 end
@@ -148,6 +154,7 @@ function send_payload(ws::HTTP.WebSockets.WebSocket, payload::GatewayPayload)
         @debug "Finished sending payload"
     catch ex
         @error "Unable to send gateway payload: $ex"
+        show_error(ex)
         rethrow(ex)
     end
     return nothing
@@ -175,6 +182,7 @@ function start_heartbeat(tracker::GatewayTracker)
             @info "Heartbeat loop stopped by control plane"
         else
             @error "Heartbeat loop exited with error: $ex"
+            show_error(ex)
         end
     end
     return tracker.heartbeat_task
@@ -209,6 +217,7 @@ function start_processor(tracker::GatewayTracker)
             @info "Processor loop stopped by control plane"
         else
             @error "Processor loop error: $ex"
+            show_error(ex)
         end
     end
     return tracker.processor_task
@@ -249,42 +258,14 @@ function stop_task(tracker::GatewayTracker, task_field::Symbol)
         return false
     catch ex
         @error "Unexpected exception while stopping task: $ex" task_field task
+        show_error(ex)
         return false
     end
 end
 
-# The controller continuously take commands from the input channel and execute
-# respective commands. The command must be a subtype of AbstractControlRequest.
-# Return the controller task.
-#
-# TODO processing each command can be done async as well.
-function start_controller(tracker::GatewayTracker)
-    tracker.controller_task = @async try
-        while true
-            # @info "Taking next request"
-            request = take!(tracker.cin)
-            # @info "Executing control request" request
-            response = process(tracker, request)
-            # @info "Putting result to output channel"
-            put!(tracker.cout, response)
-        end
-        @info "Finished controller loop"
-    catch ex
-        if ex isa InterruptException
-            @info "Controller loop stopped by control plane"
-        else
-            @error "Controller loop error: $ex"
-        end
-    end
-    return tracker.controller_task
-end
-
-stop_controller(tracker::GatewayTracker) = stop_task(tracker, :controller_task)
-
 function stop_control_plane(tracker::GatewayTracker)
     stop_processor(tracker)
     stop_heartbeat(tracker)
-    stop_controller(tracker)
 end
 
 is_connected(tracker::GatewayTracker) = isopen(tracker.websocket)
@@ -298,90 +279,27 @@ function shutdown(tracker::GatewayTracker)
 end
 
 function is_operational(tracker::GatewayTracker)
-    return is_task_runnable(tracker.controller_task) &&
+    return is_connected(tracker) &&
         is_task_runnable(tracker.heartbeat_task) &&
-        is_task_runnable(tracker.processor_task) &&
-        is_connected(tracker)
+        is_task_runnable(tracker.processor_task)
 end
 
-# === Control Requests ===
+doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
 
 # In general, tasks started with @async should be schedulded immediately.
 # But if it doesn't, then we can wait a little bit before giving up.
 function wait_for_task_to_get_scheduled(task::Task)
-    cnt = 0
-    while cnt < 50
+    max_wait_time = Second(30)
+    start_ts = now()
+    while true
+        elapsed = now() - start_ts
+        elapsed > max_wait_time && break
         if istaskstarted(task)
-            @debug "Task scheduled!" task
-            return true
+            @info "Task scheduled!" task elapsed
+            return nothing
         end
-        cnt += 1
         sleep(0.1)
     end
-    if istaskfailed(task)
-        @error "waiting for task to be scheduled but it failed" task
-        return false
-    end
-    @error "waiting for task to be scheduled but it never got started" task
-    @async Base.throwto(task, InterruptException())
-    return false
+    @warn "waiting for task to be scheduled but it never got started" task
+    return nothing
 end
-
-function process end
-
-# func: must return a Task object
-function _start_process(tracker::GatewayTracker, task_field::Symbol, func::Base.Callable)
-    task = func(tracker)
-    ok = wait_for_task_to_get_scheduled(task)
-    if ok
-        setproperty!(tracker, task_field, task)
-        return GeneralControlResponse(ControlResult.OK)
-    else
-        return GeneralControlResponse(ControlResult.FAILED)
-    end
-end
-
-# func: must return a bool
-function _stop_process(tracker::GatewayTracker, task_field::Symbol, func::Base.Callable)
-    ok = func(tracker)
-    if ok
-        setproperty!(tracker, task_field, nothing)  # not needed? do it just in case.
-        return GeneralControlResponse(ControlResult.OK)
-    else
-        return GeneralControlResponse(ControlResult.FAILED)
-    end
-end
-
-function process(tracker::GatewayTracker, ::StartHeartbeatControlRequest)
-    _start_process(tracker, :heartbeat_task, start_heartbeat)
-end
-
-function process(tracker::GatewayTracker, ::StopHeartbeatControlRequest)
-    _stop_process(tracker, :heartbeat_task, stop_heartbeat)
-end
-
-function process(tracker::GatewayTracker, ::StartProcessorControlRequest)
-    _start_process(tracker, :processor_task, start_processor)
-end
-
-function process(tracker::GatewayTracker, ::StopProcessControlRequest)
-    _stop_process(tracker, :processor_task, stop_processor)
-end
-
-
-#=
-The controller idea is probably the best way to keep the connection alive.
-Or we can call it the control plane.
-
-It monitors sub-processes (heartbeat, processor, etc) and the state of the websocket.
-If anything goes wrong then it can close the websocket and start over.
-So the procedure looks like:
-
-control plane init:
-1. get gateway url
-
-"start" command:
-1. open web socket and start heartbeat & processor loops
-2. open
-
-=#
