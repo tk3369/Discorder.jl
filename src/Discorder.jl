@@ -4,10 +4,12 @@ using Base.Iterators: Pairs
 
 using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year
 
+using EnumX: @enumx
 using HTTP: HTTP, Form, Response, StatusError, escapeuri, header, request
 using JSON3: JSON3, StructTypes
 using Parameters: @with_kw
-using EnumX: @enumx
+using LoggingFacilities: TimestampTransformerLogger, BeginningMessageLocation,
+    current_logger, with_logger
 
 const API_BASE = "https://discord.com/api"
 const API_VERSION = 9
@@ -27,5 +29,6 @@ include("objects.jl")
 include("rate_limiter.jl")
 include("clients.jl")
 include("routes.jl")
+include("gateway.jl")
 
 end

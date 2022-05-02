@@ -321,3 +321,6 @@ RESOURCE[] = "webhook"
 @route execute_webhook POST "/webhooks/$webhook/$token" Message query=(wait=true,) kwargs
 @route execute_webhook_github POST "/webhooks/$webhook/$token/github" Message query=(wait=true,) kwargs
 @route execute_webhook_slack POST "/webhooks/$webhook/$token/slack" Message query=(wait=true,) kwargs
+
+RESOURCE[] = "gateway"
+@route get_gateway GET "/gateway" Gateway
