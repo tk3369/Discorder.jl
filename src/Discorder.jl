@@ -3,12 +3,12 @@ module Discorder
 using Base.Iterators: Pairs
 
 using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
-using Logging: Logging, ConsoleLogger, with_logger
+using Logging: Logging, with_logger
 
 using EnumX: @enumx
 using HTTP: HTTP, Form, Response, StatusError, escapeuri, header, request
 using JSON3: JSON3, StructTypes
-using LoggingExtras: TransformerLogger
+using LoggingExtras: TransformerLogger, FileLogger, MinLevelLogger
 using Parameters: @with_kw
 using TimeZones: localzone
 
@@ -27,10 +27,13 @@ end
 
 include("snowflake.jl")
 include("permissions.jl")
+include("json.jl")
+include("macros.jl")
 include("objects.jl")
 include("rate_limiter.jl")
 include("clients.jl")
 include("routes.jl")
+include("constants.jl")
 include("gateway.jl")
 
 end

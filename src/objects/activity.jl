@@ -1,12 +1,19 @@
-# https://discord.com/developers/docs/game-sdk/activities#data-models-activity-struct
+# https://discord.com/developers/docs/topics/gateway#activity-object-activity-structure
+# Note that there's another Activity structure defined in the Game SDK.
+# We will just ignore that one for now.
 @discord_object struct Activity
-    application_id::Int
     name::String
-    state::String
-    details::String
+    type::Int
+    url::String
+    created_at::Int
     timestamps::ActivityTimestamps
-    assets::ActivityAssets
+    application_id::Snowflake
+    details::String
+    state::String
+    emoji::ActivityEmoji
     party::ActivityParty
+    assets::ActivityAssets
     secrets::ActivitySecrets
     instance::Bool
+    flags::Int
 end

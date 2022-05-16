@@ -1,4 +1,4 @@
-# https://discord.com/developers/docs/game-sdk/activities#data-models-activitysecrets-struct
+# https://discord.com/developers/docs/topics/gateway#activity-object-activity-secrets
 @discord_object struct ActivitySecrets
     match::String
     join::String

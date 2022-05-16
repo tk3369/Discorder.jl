@@ -1,5 +1,5 @@
-# https://discord.com/developers/docs/game-sdk/activities#data-models-activityparty-struct
+# https://discord.com/developers/docs/topics/gateway#activity-object-activity-party
 @discord_object struct ActivityParty
     id::String
-    size::PartySize
+    size::Vector{Int}   # current_size, max_size
 end

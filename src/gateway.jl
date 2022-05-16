@@ -1,9 +1,3 @@
-include("gateway/enums.jl")
-include("gateway/error.jl")
-include("gateway/session_start_limit.jl")
-include("gateway/gateway.jl")
-include("gateway/payload.jl")
-
 const Optional{T} = Union{T,Nothing}
 
 # Gateway tracker
@@ -16,6 +10,7 @@ const Optional{T} = Union{T,Nothing}
     master_task::Optional{Task} = nothing
     doctor_task::Optional{Task} = nothing
     terminate_flag::Bool = false
+    ready::Bool = false
 end
 
 struct GatewayError <: Exception
@@ -28,11 +23,13 @@ function get_logger(debug::Bool)
         merge(log, (; message = "$current_time $(log.message)"))
     end
     level = debug ? Logging.Debug : Logging.Info
-    return timestamp_logger(ConsoleLogger(stdout, level))
+    return timestamp_logger(MinLevelLogger(FileLogger("Discorder.log"), level))
 end
 
 function show_error(ex::Exception)
-    Base.showerror(stderr, ex, Base.catch_backtrace())
+    bt = Base.catch_backtrace()
+    @error "show_error" ex bt
+    # Base.showerror(stderr, ex, )
 end
 
 # ---------------------------------------------------------------------------
@@ -71,15 +68,19 @@ function start_control_plane(client::BotClient)
 
             heartbeat_interval_ms = payload.d["heartbeat_interval"]
             tracker = GatewayTracker(; websocket, heartbeat_interval_ms)
-            notify(tracker_ready)
+
+            send_identify(tracker)
 
             @debug "Starting heartbeat and processor tasks"
             start_heartbeat(tracker)
             start_processor(tracker)
+            notify(tracker_ready)
 
             @debug "Waiting for heartbeat and processor tasks"
+            @debug "heartbeat_task = $(tracker.heartbeat_task)"
+            @debug "processor_task = $(tracker.processor_task)"
             wait(tracker.heartbeat_task)
-            wait(tracker.heartbeat_task)
+            wait(tracker.processor_task)
 
             @info "Finished control plane process"
         end
@@ -112,6 +113,26 @@ function start_control_plane(client::BotClient)
         show_error(ex)
     end
     return tracker
+end
+
+my_token() = get(ENV, "DISCORD_TOKEN", "")
+
+# https://discord.com/developers/docs/topics/gateway#identifying
+function send_identify(tracker::GatewayTracker)
+    @info "Sending IDENTIFY payload"
+    payload = GatewayPayload(
+        op = GatewayOpcode.Identify,
+        d = Identify(;
+            token = my_token(),
+            intents = Int(0x01ffff),
+            properties = IdentifyConnectionProperties(;
+                os_ = "linux",
+                browser_ = "Discorder",
+                device_ = "Discorder",
+            ),
+        ),
+    )
+    send_payload(tracker.websocket, payload)
 end
 
 # Run control plane in a loop so that we can actually auto-recover
@@ -279,9 +300,19 @@ function shutdown(tracker::GatewayTracker)
 end
 
 function is_operational(tracker::GatewayTracker)
-    return is_connected(tracker) &&
-        is_task_runnable(tracker.heartbeat_task) &&
-        is_task_runnable(tracker.processor_task)
+    if is_connected(tracker)
+        @error "Websocket already closed"
+        return false
+    end
+    if !is_task_runnable(tracker.heartbeat_task)
+        @error "Heartbeat task not running anymore"
+        return false
+    end
+    if !is_task_runnable(tracker.processor_task)
+        @error "Processor task not running anymore"
+        return false
+    end
+    return true
 end
 
 doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
