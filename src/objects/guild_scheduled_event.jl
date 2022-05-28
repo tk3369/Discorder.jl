@@ -6,8 +6,8 @@
     creator_id::Snowflake
     name::String
     description::String
-    scheduled_start_time::Union{String,DateTime}
-    scheduled_end_time::Union{String,DateTime}
+    scheduled_start_time::Timestamp
+    scheduled_end_time::Timestamp
     privacy_level::PrivacyLevel.T
     status::GuildScheduledEventStatus.T
     entity_type::GuildScheduledEventEntityType.T

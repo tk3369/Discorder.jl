@@ -25,7 +25,7 @@
     system_channel_id::Snowflake
     system_channel_flags::Int
     rules_channel_id::Snowflake
-    joined_at::Union{String, DateTime}
+    joined_at::Timestamp
     large::Bool
     unavailable::Bool
     member_count::Int

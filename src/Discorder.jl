@@ -10,7 +10,7 @@ using HTTP: HTTP, Form, Response, StatusError, escapeuri, header, request
 using JSON3: JSON3, StructTypes
 using LoggingExtras: TransformerLogger, FileLogger, MinLevelLogger
 using Parameters: @with_kw
-using TimeZones: localzone
+using TimeZones: localzone, ZonedDateTime
 
 
 const API_BASE = "https://discord.com/api"
@@ -28,6 +28,8 @@ end
 include("types.jl")
 include("snowflake.jl")
 include("permissions.jl")
+include("timestamp.jl")
+include("utils.jl")
 include("json.jl")
 include("macros.jl")
 include("objects.jl")

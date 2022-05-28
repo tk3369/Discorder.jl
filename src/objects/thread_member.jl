@@ -2,6 +2,6 @@
 @discord_object struct ThreadMember
     id::Snowflake
     user_id::Snowflake
-    join_timestamp::Union{String,DateTime}
+    join_timestamp::Timestamp
     flags::Int
 end

@@ -12,5 +12,5 @@
     self_stream::Bool
     self_video::Bool
     suppress::Bool
-    request_to_speak_timestamp::Union{String, DateTime}
+    request_to_speak_timestamp::Timestamp
 end

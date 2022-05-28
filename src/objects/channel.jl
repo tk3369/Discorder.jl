@@ -17,7 +17,7 @@
     owner_id::Snowflake
     application_id::Snowflake
     parent_id::Snowflake
-    last_pin_timestamp::Union{String, DateTime}
+    last_pin_timestamp::Timestamp
     rtc_region::String
     video_quality_mode::Int
     message_count::Int

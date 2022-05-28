@@ -11,7 +11,7 @@
     expire_grace_period::Int
     user::User
     account::IntegrationAccount
-    synced_at::Union{String, DateTime}
+    synced_at::Timestamp
     subscriber_count::Int
     revoked::Bool
     application::IntegrationApplication

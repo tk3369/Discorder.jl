@@ -9,7 +9,7 @@
     target_application::Application # partial
     approximate_presence_count::Int
     approximate_member_count::Int
-    expires_at::Union{String, DateTime}
+    expires_at::Timestamp
     stage_instance::InviteStageInstance
     guild_scheduled_event::GuildScheduledEvent
 end

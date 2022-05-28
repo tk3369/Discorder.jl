@@ -4,11 +4,11 @@
     nick::String
     avatar::String
     roles::Vector{Snowflake}
-    joined_at::Union{String, DateTime}
-    premium_since::Union{String, DateTime}
+    joined_at::Timestamp
+    premium_since::Timestamp
     deaf::Bool
     mute::Bool
     pending::Bool
     permissions::Permissions
-    communication_disabled_until::Union{String, DateTime}
+    communication_disabled_until::Timestamp
 end

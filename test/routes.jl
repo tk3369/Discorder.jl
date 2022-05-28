@@ -44,7 +44,6 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             channel = text_general
             message = D.create_message(client, channel; content="hello")
             @test message.content == "hello"
-            @test message.timestamp isa DateTime
             @test D.get_channel_message(client, channel, message).id == message.id
             messages = D.get_channel_messages(client, channel)
             @test length(messages) == 1 && messages[1].id == message.id
@@ -73,6 +72,7 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             ids = map(i -> D.create_message(client, channel; content="hi").id, 1:5)
             @test length(D.get_channel_messages(client, channel)) == 5
             D.delete_messages(client, channel; messages=ids)
+            sleep(1) # give it a little time to really delete the messages
             @test isempty(D.get_channel_messages(client, channel))
 
             # Listing, creating, deleting invites.

@@ -62,9 +62,7 @@ function parse_response(resp::Response, Into)
     return if resp.status == 204
         nothing
     elseif header(resp, "Content-Type") == "application/json"
-        x = try_parse_json(resp.body, Into)
-        fix_datetimes!(x)
-        x
+        try_parse_json(resp.body, Into)
     else
         resp.body
     end
@@ -79,35 +77,6 @@ function try_parse_json(response::Vector{UInt8}, Into)
         @error "Unable to parse response: $e"
         println(str)
         rethrow(e)
-    end
-end
-
-# I hate this lol
-# function fix_permissions!(x::T) where T
-#     for name in fieldnames(T)
-#         if name == :permissions && fieldtype(T, name) >: Union{String,UInt64}
-#             setfield!(x, name, parse(UInt64, getfield(x, name)))
-#         end
-#     end
-# end
-
-# I hate this.
-parse_datetime(s) = DateTime(replace(s, "+" => ".000+")[1:23], ISODateTimeFormat)
-fix_datetimes!(xs::Vector) = foreach(fix_datetimes!, xs)
-function fix_datetimes!(x::T) where T
-    for name in fieldnames(T)
-        if DateTime <: fieldtype(T, name)
-            f = getfield(x, name)
-            if f isa String
-                setfield!(x, name, parse_datetime(f))
-            elseif f isa Int
-                d = unix2datetime(f)
-                if year(d) == 1970
-                    d = unix2datetime(1000f)
-                end
-                setfield!(x, name, d)
-            end
-        end
     end
 end
 

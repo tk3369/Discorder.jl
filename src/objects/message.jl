@@ -6,8 +6,8 @@
     author::User
     member::GuildMember # partial
     content::String
-    timestamp::Union{String, DateTime}
-    edited_timestamp::Union{String, DateTime}
+    timestamp::Timestamp
+    edited_timestamp::Timestamp
     tts::Bool
     mention_everyone::Bool
     mentions::Vector{User}

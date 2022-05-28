@@ -4,7 +4,7 @@
     type::String
     description::String
     url::String
-    timestamp::Union{String, DateTime}
+    timestamp::Timestamp
     color::Int
     footer::EmbedFooter
     image::EmbedImage
