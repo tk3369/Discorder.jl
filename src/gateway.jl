@@ -18,10 +18,11 @@ struct GatewayError <: Exception
 end
 
 function get_logger(debug::Bool)
-    timestamp_logger(logger) = TransformerLogger(logger) do log
-        current_time = now(localzone())
-        merge(log, (; message = "$current_time $(log.message)"))
-    end
+    timestamp_logger(logger) =
+        TransformerLogger(logger) do log
+            current_time = now(localzone())
+            merge(log, (; message="$current_time $(log.message)"))
+        end
     level = debug ? Logging.Debug : Logging.Info
     return timestamp_logger(MinLevelLogger(FileLogger("Discorder.log"), level))
 end
@@ -59,7 +60,7 @@ function start_control_plane(client::BotClient)
         @info "Connecting to gateway" url
         HTTP.WebSockets.open(url) do websocket
             json = readavailable(websocket)
-            @debug "Received" json
+            @debug "Received" String(deepcopy(json))
             isempty(json) && throw(GatewayError("No data was received"))
 
             payload = JSON3.read(json, GatewayPayload)
@@ -79,8 +80,8 @@ function start_control_plane(client::BotClient)
             @debug "Waiting for heartbeat and processor tasks"
             @debug "heartbeat_task = $(tracker.heartbeat_task)"
             @debug "processor_task = $(tracker.processor_task)"
-            wait(tracker.heartbeat_task)
-            wait(tracker.processor_task)
+            safe_wait(tracker.heartbeat_task)
+            safe_wait(tracker.processor_task)
 
             @info "Finished control plane process"
         end
@@ -115,34 +116,50 @@ function start_control_plane(client::BotClient)
     return tracker
 end
 
-my_token() = get(ENV, "DISCORD_TOKEN", "")
+function safe_wait(task)
+    try
+        wait(task)
+    catch ex
+        if ex isa MethodError && length(ex.args) > 0 && isnothing(ex.args[1])
+            @warn "Task already be set to nothing by control plane doctor?"
+        else
+            @warn "Unable to wait for task: exception=$ex"
+        end
+    end
+end
+
+function default_token()
+    token = get(ENV, "DISCORD_TOKEN", "")
+    isempty(token) && error("Please define DISCORD_TOKEN environemnt variable.")
+    return token
+end
 
 # https://discord.com/developers/docs/topics/gateway#identifying
 function send_identify(tracker::GatewayTracker)
     @info "Sending IDENTIFY payload"
     payload = GatewayPayload(
-        op = GatewayOpcode.Identify,
-        d = Identify(;
-            token = my_token(),
-            intents = Int(0x01ffff),
-            properties = IdentifyConnectionProperties(;
-                os_ = "linux",
-                browser_ = "Discorder",
-                device_ = "Discorder",
-            ),
+        op=GatewayOpcode.Identify,
+        d=Identify(;
+            token=default_token(),
+            intents=Int(0x01ffff),
+            properties=IdentifyConnectionProperties(;
+                os_="linux",
+                browser_="Discorder",
+                device_="Discorder"
+            )
         ),
     )
     send_payload(tracker.websocket, payload)
 end
 
 # Run control plane in a loop so that we can actually auto-recover
-function run_control_plane(client::BotClient, tracker_ref=Ref{GatewayTracker}(); debug=true)
+function run_control_plane(client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(); debug=true)
     with_logger(get_logger(debug)) do
         while true
             @info "Starting a new control plane"
             elapsed = @elapsed tracker_ref[] = start_control_plane(client)
             @info "Started control plane in $elapsed seconds"
-            wait(tracker_ref[].master_task)
+            safe_wait(tracker_ref[].master_task)
             tracker_ref[].terminate_flag && break
         end
         @info "Control plan has been fully shut down"
@@ -155,6 +172,7 @@ function start_doctor(tracker::GatewayTracker)
         while true
             if !is_operational(tracker)
                 @info "Gateway is not healthy, stopping control plane" tracker
+                sleep(5)
                 stop_control_plane(tracker)
                 break
             end
@@ -169,9 +187,9 @@ end
 
 function send_payload(ws::HTTP.WebSockets.WebSocket, payload::GatewayPayload)
     try
-        json = JSON3.write(payload)
-        @debug "Sending payload" json
-        write(ws, json)
+        str = json(payload)
+        @debug "Sending payload" str
+        write(ws, str)
         @debug "Finished sending payload"
     catch ex
         @error "Unable to send gateway payload: $ex"
@@ -190,7 +208,7 @@ function start_heartbeat(tracker::GatewayTracker)
     tracker.heartbeat_task = @async try
         while true
             seq = tracker.seq < 0 ? nothing : tracker.seq
-            payload = GatewayPayload(; op = GatewayOpcode.Heartbeat, d = seq)
+            payload = GatewayPayload(; op=GatewayOpcode.Heartbeat, d=seq)
             send_payload(tracker.websocket, payload)
             jitter = rand()  # should be between 0 and 1 per API Reference
             nap = tracker.heartbeat_interval_ms / 1000 * jitter
@@ -220,7 +238,7 @@ function start_processor(tracker::GatewayTracker)
         while true
             if isopen(tracker.websocket)
                 json = readavailable(tracker.websocket)
-                @debug "Received" json
+                @debug "Received" String(deepcopy(json))
                 if !isempty(json)
                     payload = JSON3.read(json, GatewayPayload)
                     @debug "Parsed" payload.op payload.d
@@ -300,7 +318,7 @@ function shutdown(tracker::GatewayTracker)
 end
 
 function is_operational(tracker::GatewayTracker)
-    if is_connected(tracker)
+    if !is_connected(tracker)
         @error "Websocket already closed"
         return false
     end

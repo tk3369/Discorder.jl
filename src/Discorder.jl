@@ -25,6 +25,7 @@ const USER_AGENT = let
     "DiscordBot ($package_url, $package_version) / Julia $julia_version"
 end
 
+include("types.jl")
 include("snowflake.jl")
 include("permissions.jl")
 include("json.jl")

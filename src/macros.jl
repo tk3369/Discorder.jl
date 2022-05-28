@@ -5,6 +5,10 @@ macro discord_object(typedef)
     # Make the type mutable.
     typedef.args[1] = true
 
+    # Make it inherit from a standard abstract type
+    struct_name = typedef.args[2]
+    typedef.args[2] = Expr(:(<:), struct_name, AbstractDiscordObject)
+
     # Make all the types nullable/optional with a default value of `missing`.
     fields = typedef.args[3].args
     for (i, field) in enumerate(fields)
@@ -15,14 +19,14 @@ macro discord_object(typedef)
             # 1. Nullable: Union{T, A.Null, Nothing}
             # 2. Optional: Union{T, Missing}
             # 3. Nulllable and optional: Union{T, A.Null, Nothing, Missing}
-            field.args[2] = :(Union{$type, A.Null, Nothing, Missing})
+            field.args[2] = :(Union{$type,A.Null,Nothing,Missing})
             fields[i] = :($field = missing)
         end
     end
     typedef_withkw = esc(:(@with_kw $typedef))
 
     # Enable JSON IO for the type.
-    name = esc(typedef.args[2])
+    name = esc(struct_name)
     json_methods = quote
         StructTypes.StructType(::Type{$name}) = StructTypes.Mutable()
         JSON3.write(x::$name) = json(x)
