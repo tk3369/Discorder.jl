@@ -80,8 +80,7 @@ function start_control_plane(client::BotClient)
 
     try
         @debug "Waiting for tracker to be ready"
-        wait(tracker_ready)
-        @debug "Tracker is ready"
+        safe_wait(tracker_ready)
 
         tracker.master_task = task
 
@@ -92,7 +91,7 @@ function start_control_plane(client::BotClient)
         @debug "Waiting for processor task to get started"
         wait_for_task_to_get_scheduled(tracker.processor_task, :processor)
 
-        @debug "Starting doctor task_field"
+        @debug "Starting doctor task"
         start_doctor(tracker)
         wait_for_task_to_get_scheduled(tracker.doctor_task, :doctor)
 
@@ -111,7 +110,8 @@ function safe_wait(task)
         if ex isa MethodError && length(ex.args) > 0 && isnothing(ex.args[1])
             @warn "Task already be set to nothing by control plane doctor?"
         else
-            @warn "Unable to wait for task: exception=$ex"
+            @warn "Unable to wait for task" ex
+            show_error(ex)
         end
     end
 end
@@ -145,8 +145,8 @@ function run_control_plane(; client::BotClient=BotClient(), tracker_ref=Ref{Gate
     with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
-            elapsed = @elapsed tracker_ref[] = start_control_plane(client)
-            @info "Started control plane in $elapsed seconds"
+            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client)
+            @info "Started control plane" elapsed_seconds
             safe_wait(tracker_ref[].master_task)
             tracker_ref[].terminate_flag && break
         end
