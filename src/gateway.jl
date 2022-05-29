@@ -1,5 +1,3 @@
-const Optional{T} = Union{T,Nothing}
-
 # Gateway tracker
 @with_kw mutable struct GatewayTracker
     websocket::HTTP.WebSockets.WebSocket
