@@ -70,13 +70,13 @@ end
 
 function try_parse_json(response::Vector{UInt8}, Into)
     str = String(response)
-    @debug "Parsing: $str"
+    @debug "Parsing response" str
     try
         return JSON3.read(str, Into)
-    catch e
-        @error "Unable to parse response: $e"
+    catch ex
+        @error "Unable to parse response" ex
         println(str)
-        rethrow(e)
+        rethrow(ex)
     end
 end
 

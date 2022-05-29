@@ -15,22 +15,6 @@ struct GatewayError <: Exception
     message::String
 end
 
-function get_logger(debug::Bool)
-    timestamp_logger(logger) =
-        TransformerLogger(logger) do log
-            current_time = now(localzone())
-            merge(log, (; message="$current_time $(log.message)"))
-        end
-    level = debug ? Logging.Debug : Logging.Info
-    return timestamp_logger(MinLevelLogger(FileLogger("Discorder.log"), level))
-end
-
-function show_error(ex::Exception)
-    bt = Base.catch_backtrace()
-    @error "show_error" ex bt
-    # Base.showerror(stderr, ex, )
-end
-
 # ---------------------------------------------------------------------------
 # Control plane
 #
@@ -44,6 +28,11 @@ end
 # then a new control plane would come to live again.
 # ---------------------------------------------------------------------------
 
+function make_gateway_url(client::BotClient, version = API_VERSION)
+    gateway = get_gateway(client)
+    return "$(gateway.url)?v=$version&encoding=json"
+end
+
 """
     start_control_plane(client::BotClient)
 
@@ -53,10 +42,11 @@ function start_control_plane(client::BotClient)
     local tracker
     tracker_ready = Condition()
     task = @async try
-        gateway = get_gateway(client)
-        url = "$(gateway.url)?v=$API_VERSION&encoding=json"
-        @info "Connecting to gateway" url
-        HTTP.WebSockets.open(url) do websocket
+
+        gateway_url = make_gateway_url(client)
+        @info "Connecting to gateway" gateway_url
+
+        HTTP.WebSockets.open(gateway_url) do websocket
             json = readavailable(websocket)
             @debug "Received" String(deepcopy(json))
             isempty(json) && throw(GatewayError("No data was received"))
@@ -97,14 +87,14 @@ function start_control_plane(client::BotClient)
 
         # make sure everything is up and running before starting doctor process
         @debug "Waiting for heartbeat task to get started"
-        wait_for_task_to_get_scheduled(tracker.heartbeat_task)
+        wait_for_task_to_get_scheduled(tracker.heartbeat_task, :heartbeat)
 
         @debug "Waiting for processor task to get started"
-        wait_for_task_to_get_scheduled(tracker.processor_task)
+        wait_for_task_to_get_scheduled(tracker.processor_task, :processor)
 
         @debug "Starting doctor task_field"
         start_doctor(tracker)
-        wait_for_task_to_get_scheduled(tracker.doctor_task)
+        wait_for_task_to_get_scheduled(tracker.doctor_task, :doctor)
 
         @info "Control plane started successfully" tracker
     catch ex
@@ -127,8 +117,8 @@ function safe_wait(task)
 end
 
 function default_token()
-    token = get(ENV, "DISCORD_TOKEN", "")
-    isempty(token) && error("Please define DISCORD_TOKEN environemnt variable.")
+    token = get(ENV, "DISCORD_BOT_TOKEN", "")
+    isempty(token) && error("Please define DISCORD_BOT_TOKEN environemnt variable.")
     return token
 end
 
@@ -151,8 +141,8 @@ function send_identify(tracker::GatewayTracker)
 end
 
 # Run control plane in a loop so that we can actually auto-recover
-function run_control_plane(client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(); debug=true)
-    with_logger(get_logger(debug)) do
+function run_control_plane(; client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false)
+    with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
             elapsed = @elapsed tracker_ref[] = start_control_plane(client)
@@ -205,12 +195,14 @@ end
 function start_heartbeat(tracker::GatewayTracker)
     tracker.heartbeat_task = @async try
         while true
+            # Setting seq to `nothing` would force sending a `null`. See doc:
+            # https://discord.com/developers/docs/topics/gateway#heartbeat
             seq = tracker.seq < 0 ? nothing : tracker.seq
             payload = GatewayPayload(; op=GatewayOpcode.Heartbeat, d=seq)
             send_payload(tracker.websocket, payload)
             jitter = rand()  # should be between 0 and 1 per API Reference
             nap = tracker.heartbeat_interval_ms / 1000 * jitter
-            @info "Sent heartbeat, taking a nap for $nap seconds"
+            @info "Sent heartbeat, taking nap now." nap
             sleep(nap)
         end
         @debug "Finished heartbeat loop"
@@ -218,7 +210,7 @@ function start_heartbeat(tracker::GatewayTracker)
         if ex isa InterruptException
             @info "Heartbeat loop stopped by control plane"
         else
-            @error "Heartbeat loop exited with error: $ex"
+            @error "Heartbeat loop exited with error" ex
             show_error(ex)
         end
     end
@@ -239,7 +231,10 @@ function start_processor(tracker::GatewayTracker)
                 @debug "Received" String(deepcopy(json))
                 if !isempty(json)
                     payload = JSON3.read(json, GatewayPayload)
-                    @debug "Parsed" payload.op payload.d
+                    @debug "Parsed" payload.op payload.t payload.d payload.s
+                    if payload.s isa Integer
+                        tracker.seq = payload.s  # sync sequence number
+                    end
                 else
                     @error "Received empty array"
                     break
@@ -253,7 +248,7 @@ function start_processor(tracker::GatewayTracker)
         if ex isa InterruptException
             @info "Processor loop stopped by control plane"
         else
-            @error "Processor loop error: $ex"
+            @error "Processor loop error" ex
             show_error(ex)
         end
     end
@@ -294,7 +289,7 @@ function stop_task(tracker::GatewayTracker, task_field::Symbol)
         @error "Unable to stop task" task_field task
         return false
     catch ex
-        @error "Unexpected exception while stopping task: $ex" task_field task
+        @error "Unexpected exception while stopping task" ex task_field task
         show_error(ex)
         return false
     end
@@ -335,14 +330,14 @@ doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
 
 # In general, tasks started with @async should be schedulded immediately.
 # But if it doesn't, then we can wait a little bit before giving up.
-function wait_for_task_to_get_scheduled(task::Task)
+function wait_for_task_to_get_scheduled(task::Task, label::Symbol)
     max_wait_time = Second(30)
     start_ts = now()
     while true
         elapsed = now() - start_ts
         elapsed > max_wait_time && break
         if istaskstarted(task)
-            @info "Task scheduled!" task elapsed
+            @info "Task scheduled!" task label elapsed
             return nothing
         end
         sleep(0.1)
