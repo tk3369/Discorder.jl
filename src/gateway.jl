@@ -9,6 +9,7 @@
     doctor_task::Optional{Task} = nothing
     terminate_flag::Bool = false
     ready::Bool = false
+    events::Channel = Channel{Any}(100)
 end
 
 struct GatewayError <: Exception
@@ -38,7 +39,7 @@ end
 
 Start new control plane and return a `GatewayTracker` object.
 """
-function start_control_plane(client::BotClient)
+function start_control_plane(client::BotClient=BotClient())
     local tracker
     tracker_ready = Condition()
     task = @async try
@@ -235,6 +236,12 @@ function start_processor(tracker::GatewayTracker)
                     if payload.s isa Integer
                         tracker.seq = payload.s  # sync sequence number
                     end
+                    if !isnothing(payload.t) && !isnothing(payload.d)
+                        # TODO: this is hacky... converting it back to json string and re-parse as object
+                        object = make_object(payload.t, JSON3.write(payload.d))
+                        @debug "Made object" object
+                        put!(tracker.events, object)
+                    end
                 else
                     @error "Received empty array"
                     break
@@ -344,4 +351,35 @@ function wait_for_task_to_get_scheduled(task::Task, label::Symbol)
     end
     @warn "waiting for task to be scheduled but it never got started" task
     return nothing
+end
+
+function event_object_mappings()
+    return Dict(
+        "GUILD_CREATE" => Guild,
+        "PRESENCE_UPDATE" => PresenceUpdateEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#messages
+        "MESSAGE_CREATE" => Message,
+        "MESSAGE_UPDATE" => Message,
+        "MESSAGE_DELETE" => MessageDeleteEvent,
+        "MESSAGE_DELETE_BULK" => MessageDeleteBulkEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#message-reaction-add
+        "MESSAGE_REACTION_ADD" => MessageReactionAddEvent,
+        "MESSAGE_REACTION_REMOVE" => MessageReactionRemoveEvent,
+        "MESSAGE_REACTION_REMOVE_ALL" => MessageReactionRemoveAllEvent,
+        "MESSAGE_REACTION_REMOVE_EMOJI" => MessageReactionRemoveEmojiEvent,
+    )
+end
+
+function make_object(event_type::AbstractString, json::Optional{AbstractString})
+    mappings = event_object_mappings()
+    if haskey(mappings, event_type)
+        T = mappings[event_type]
+        object = JSON3.read(json, T)
+    else
+        # return (potentially-nested) Dict's
+        object = JSON3.read(json, Any)
+    end
+    return (; event_type, object)
 end

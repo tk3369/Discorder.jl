@@ -26,8 +26,7 @@ debugging purpose.
 """
 function show_error(ex::Exception)
     bt = Base.catch_backtrace()
-    @error "show_error" ex bt
-    # Base.showerror(stderr, ex, )
+    Base.showerror(stderr, ex, )
 end
 
 """
