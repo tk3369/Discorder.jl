@@ -1,5 +1,3 @@
-export Timestamp
-
 struct Timestamp
     dt::ZonedDateTime
 end

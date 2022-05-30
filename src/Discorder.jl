@@ -1,5 +1,7 @@
 module Discorder
 
+export BotClient, BearerClient
+
 using Base.Iterators: Pairs
 
 using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
@@ -37,6 +39,7 @@ include("rate_limiter.jl")
 include("clients.jl")
 include("routes.jl")
 include("constants.jl")
+include("event.jl")
 include("gateway.jl")
 
 end

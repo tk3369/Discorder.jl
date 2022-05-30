@@ -408,3 +408,20 @@ end
     PARTY_PRIVACY_VOICE_CHANNEL = 1 << 7
     EMBEDDED = 1 << 8
 end
+
+# https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-type
+@discord_enum InteractionType begin
+    PING = 1
+    APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
+    MODAL_SUBMIT = 5
+end
+
+# https://discord.com/developers/docs/interactions/message-components#component-object-component-types
+@discord_enum ComponentType begin
+    ActionRow = 1
+    Button = 2
+    SelectMenu = 3
+    TextInput = 4
+end

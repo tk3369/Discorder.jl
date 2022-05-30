@@ -22,6 +22,14 @@
     type::MessageType.T
     activity::MessageActivity
     application::Application
+    application_id::Snowflake
     message_reference::MessageReference
     message_flags::Int
+    flgas::Int
+    # referenced_message    # currently not supported due to self-referencing structure
+    interaction::MessageInteraction
+    thread::DiscordChannel
+    # components::Vect{Component}  # currently not supported due to self-referencing structure
+    sticker_items::Vector{StickerItem}
+    stickers::Vector{Sticker}
 end

@@ -3,10 +3,13 @@ struct ArrayBody{T}
     xs::T
 end
 
-JSON3.write(kw::Pairs{Symbol, ArrayBody{T}, Tuple{Symbol}, NamedTuple{(:array,), Tuple{ArrayBody{T}}}}) where T =
-    JSON3.write(values(kw).array.xs)
+function JSON3.write(
+    kw::Pairs{Symbol,ArrayBody{T},Tuple{Symbol},NamedTuple{(:array,),Tuple{ArrayBody{T}}}}
+) where {T}
+    return JSON3.write(values(kw).array.xs)
+end
 
-function api_call(c, method, path, Into=Nothing, params=Dict();  kwargs...)
+function api_call(c, method, path, Into=Nothing, params=Dict(); kwargs...)
     @debug "$method $path"
 
     headers = [
@@ -25,8 +28,7 @@ function api_call(c, method, path, Into=Nothing, params=Dict();  kwargs...)
                 boundary = (; boundary=pop!(kw_dict, :__boundary__))
             end
             form = Form(
-                Dict(:file => file, :payload_json => JSON3.write(kw_dict));
-                boundary...,
+                Dict(:file => file, :payload_json => JSON3.write(kw_dict)); boundary...
             )
             form, params
         else
@@ -84,7 +86,6 @@ path_argname(s) = s
 path_argname(s::Symbol) = string("<", s === :emoji_id ? :emoji : s, ">")
 path_argname(ex::Expr) = path_argname(ex.args[1])
 
-
 # TODO: Refactor this to be not huge and ugly.
 macro route(name, method, path, kwargs...)
     if path isa String
@@ -105,7 +106,7 @@ macro route(name, method, path, kwargs...)
                 if v === :nothing && i == lastindex(path.args)
                     # When the argument is omitted, remove the trailing slash.
                     done = true
-                    path.args[i-1] = path.args[i-1][1:end-1]
+                    path.args[i - 1] = path.args[i - 1][1:(end - 1)]
                     insert!(path.args, i, :($k === nothing ? "" : "/"))
                     i += 1
                     :($k === nothing ? "" : $k)
@@ -181,7 +182,7 @@ macro route(name, method, path, kwargs...)
     return esc(block)
 end
 
-const HasID = Union{Guild, DiscordChannel, User, Message, Overwrite, Role, Webhook}
+const HasID = Union{Guild,DiscordChannel,User,Message,Overwrite,Role,Webhook}
 HTTP.escapeuri(x::HasID) = string(x.id)
 HTTP.escapeuri(e::Emoji) = escapeuri(e.name)
 HTTP.escapeuri(i::Invite) = escapeuri(i.code)
@@ -189,89 +190,92 @@ HTTP.escapeuri(i::Invite) = escapeuri(i.code)
 const RESOURCE = Ref{String}()
 
 RESOURCE[] = "audit-log"
-@route get_guild_audit_log GET "/guilds/$guild/audit-logs" AuditLog kwargs
+@route get_guild_audit_log GET "/guilds/$guild_id/audit-logs" AuditLog kwargs
 
 RESOURCE[] = "channel"
-@route get_channel GET "/channels/$channel" DiscordChannel kwargs
-@route update_channel PATCH "/channels/$channel" DiscordChannel kwargs
-@route delete_channel DELETE "/channels/$channel" DiscordChannel
-@route get_channel_messages GET "/channels/$channel/messages" Vector{Message} kwargs
-@route get_channel_message GET "/channels/$channel/messages/$message" Message
-@route create_message POST "/channels/$channel/messages" Message kwargs
-@route create_reaction PUT "/channels/$channel/messages/$message/reactions/$emoji/@me"
-@route delete_reaction DELETE "/channels/$channel/messages/$message/reactions/$emoji/$(user="@me")"
-@route get_reactions GET "/channels/$channel/messages/$message/reactions/$emoji" Vector{User} kwargs
-@route delete_all_reactions DELETE "/channels/$channel/messages/$message/reactions/$(emoji=nothing)"
-@route update_message PATCH "/channels/$channel/messages/$message" Message kwargs
-@route delete_message DELETE "/channels/$channel/messages/$message"
-@route delete_messages POST "/channels/$channel/messages/bulk-delete" kwargs
-@route update_channel_permissions PUT "/channels/$channel/permissions/$overwrite" kwargs
-@route get_channel_invites GET "/channels/$channel/invites" Vector{Invite} kwargs
-@route create_channel_invite POST "/channels/$channel/invites" Invite kwargs
-@route delete_channel_permission DELETE "/channels/$channel/permissions/$overwrite"
-@route create_typing_indicator POST "/channels/$channel/typing"
-@route get_pinned_messages GET "/channels/$channel/pins" Vector{Message}
-@route create_pinned_channel_message PUT "/channels/$channel/pins/$message"
-@route delete_pinned_channel_message DELETE "/channels/$channel/pins/$message"
-@route create_group_dm_recipient PUT "/channels/$channel/recipients/$user" kwargs
-@route delete_group_dm_recipient DELETE "/channels/$channel/recipients/$user"
+@route get_channel GET "/channels/$channel_id" DiscordChannel kwargs
+@route update_channel PATCH "/channels/$channel_id" DiscordChannel kwargs
+@route delete_channel DELETE "/channels/$channel_id" DiscordChannel
+@route get_channel_messages GET "/channels/$channel_id/messages" Vector{Message} kwargs
+@route get_channel_message GET "/channels/$channel_id/messages/$message_id" Message
+@route create_message POST "/channels/$channel_id/messages" Message kwargs
+@route create_reaction PUT "/channels/$channel_id/messages/$message_id/reactions/$emoji/@me"
+@route delete_reaction DELETE "/channels/$channel_id/messages/$message_id/reactions/$emoji/$(user="@me")"
+@route get_reactions GET "/channels/$channel_id/messages/$message_id/reactions/$emoji" Vector{
+    User
+} kwargs
+@route delete_all_reactions DELETE "/channels/$channel_id/messages/$message_id/reactions/$(emoji=nothing)"
+@route update_message PATCH "/channels/$channel_id/messages/$message_id" Message kwargs
+@route delete_message DELETE "/channels/$channel_id/messages/$message_id"
+@route delete_messages POST "/channels/$channel_id/messages/bulk-delete" kwargs
+@route update_channel_permissions PUT "/channels/$channel_id/permissions/$overwrite" kwargs
+@route get_channel_invites GET "/channels/$channel_id/invites" Vector{Invite} kwargs
+@route create_channel_invite POST "/channels/$channel_id/invites" Invite kwargs
+@route delete_channel_permission DELETE "/channels/$channel_id/permissions/$overwrite"
+@route create_typing_indicator POST "/channels/$channel_id/typing"
+@route get_pinned_messages GET "/channels/$channel_id/pins" Vector{Message}
+@route create_pinned_channel_message PUT "/channels/$channel_id/pins/$message_id"
+@route delete_pinned_channel_message DELETE "/channels/$channel_id/pins/$message_id"
+@route create_group_dm_recipient PUT "/channels/$channel_id/recipients/$user_id" kwargs
+@route delete_group_dm_recipient DELETE "/channels/$channel_id/recipients/$user_id"
 
 RESOURCE[] = "emoji"
-@route get_guild_emojis GET "/guilds/$guild/emojis" Vector{Emoji}
-@route get_guild_emoji GET "/guilds/$guild/emojis/$emoji_id" Emoji
-@route create_guild_emoji POST "/guilds/$guild/emojis" Emoji kwargs
-@route update_guild_emoji PATCH "/guilds/$guild/emojis/$emoji_id" Emoji kwargs
-@route delete_guild_emoji DELETE "/guilds/$guild/emojis/$emoji_id"
+@route get_guild_emojis GET "/guilds/$guild_id/emojis" Vector{Emoji}
+@route get_guild_emoji GET "/guilds/$guild_id/emojis/$emoji_id" Emoji
+@route create_guild_emoji POST "/guilds/$guild_id/emojis" Emoji kwargs
+@route update_guild_emoji PATCH "/guilds/$guild_id/emojis/$emoji_id" Emoji kwargs
+@route delete_guild_emoji DELETE "/guilds/$guild_id/emojis/$emoji_id"
 
 RESOURCE[] = "guild"
 @route create_guild POST "/guilds" Guild kwargs
-@route get_guild GET "/guilds/$guild" Guild kwargs
-@route get_guild_preview GET "/guilds/$guild/preview" Guild
-@route update_guild PATCH "/guilds/$guild" Guild kwargs
-@route delete_guild DELETE "/guilds/$guild"
-@route get_guild_channels GET "/guilds/$guild/channels" Vector{DiscordChannel}
-@route create_guild_channel POST "/guilds/$guild/channels" DiscordChannel kwargs
-@route update_guild_channel_positions PATCH "/guilds/$guild/channels" array=positions
-@route get_guild_member GET "/guilds/$guild/members/$user" GuildMember
-@route get_guild_members GET "/guilds/$guild/members" Vector{GuildMember} kwargs
-@route create_guild_member PUT "/guilds/$guild/members/$user" GuildMember kwargs
-@route update_guild_member PATCH "/guilds/$guild/members/$user" kwargs
-@route modify_user_nick PATCH "/guilds/$guild/members/@me/nick" UserNickChange kwargs
-@route create_guild_member_role PUT "/guilds/$guild/members/$user/roles/$role"
-@route delete_guild_member_role DELETE "/guilds/$guild/members/$user/roles/$role"
-@route delete_guild_member DELETE "/guilds/$guild/members/$user"
-@route get_guild_bans GET "/guilds/$guild/bans" Vector{Guild}
-@route get_guild_ban GET "/guilds/$guild/bans/$user" Ban
-@route create_guild_ban PUT "/guilds/$guild/bans/$user" kwargs
-@route delete_guild_ban DELETE "/guilds/$guild/bans/$user"
-@route get_guild_roles GET "/guilds/$guild/roles" Vector{Role}
-@route create_guild_role POST "/guilds/$guild/roles" Role kwargs
-@route update_guild_role_positions PATCH "/guilds/$guild/roles" Vector{Role} array=positions
-@route update_guild_role PATCH "/guilds/$guild/roles/$role" Role kwargs
-@route delete_guild_role DELETE "/guilds/$guild/roles/$role"
-@route get_guild_prune_count GET "/guilds/$guild/prune" PruneCount kwargs
-@route create_guild_prunt POST "/guilds/$guild/prune" PruneCount kwargs
-@route get_guild_voice_regions GET "/guilds/$guild/regions" Vector{VoiceRegion}
-@route get_guild_invites GET "/guilds/$guild/invites" Vector{Invite}
-@route get_guild_integrations GET "/guilds/$guild/integrations" Vector{Integration}
-@route create_guild_integration POST "/guilds/$guild/integrations" kwargs
-@route update_guild_integration PATCH "/guilds/$guild/integrations/$integration" kwargs
-@route delete_guild_integration PATCH "/guilds/$guild/integrations/$integration"
-@route sync_guild_integration POST "/guilds/$guild/integrations/$integration/sync"
-@route get_guild_widget GET "/guilds/$guild/widget" GuildWidget
-@route update_guild_widget PATCH "/guilds/$guild/widget" GuildWidget kwargs
-@route get_guild_vanity_url GET "/guilds/$guild/vanity-url" Invite
-@route get_guild_widget_image GET "/guilds/$guild/widget.png" String
+@route get_guild GET "/guilds/$guild_id" Guild kwargs
+@route get_guild_preview GET "/guilds/$guild_id/preview" Guild
+@route update_guild PATCH "/guilds/$guild_id" Guild kwargs
+@route delete_guild DELETE "/guilds/$guild_id"
+@route get_guild_channels GET "/guilds/$guild_id/channels" Vector{DiscordChannel}
+@route create_guild_channel POST "/guilds/$guild_id/channels" DiscordChannel kwargs
+@route update_guild_channel_positions PATCH "/guilds/$guild_id/channels" array = positions
+@route get_guild_member GET "/guilds/$guild_id/members/$user_id" GuildMember
+@route get_guild_members GET "/guilds/$guild_id/members" Vector{GuildMember} kwargs
+@route create_guild_member PUT "/guilds/$guild_id/members/$user_id" GuildMember kwargs
+@route update_guild_member PATCH "/guilds/$guild_id/members/$user_id" kwargs
+@route modify_user_nick PATCH "/guilds/$guild_id/members/@me/nick" UserNickChange kwargs
+@route create_guild_member_role PUT "/guilds/$guild_id/members/$user_id/roles/$role_id"
+@route delete_guild_member_role DELETE "/guilds/$guild_id/members/$user_id/roles/$role_id"
+@route delete_guild_member DELETE "/guilds/$guild_id/members/$user_id"
+@route get_guild_bans GET "/guilds/$guild_id/bans" Vector{Guild}
+@route get_guild_ban GET "/guilds/$guild_id/bans/$user_id" Ban
+@route create_guild_ban PUT "/guilds/$guild_id/bans/$user_id" kwargs
+@route delete_guild_ban DELETE "/guilds/$guild_id/bans/$user_id"
+@route get_guild_roles GET "/guilds/$guild_id/roles" Vector{Role}
+@route create_guild_role POST "/guilds/$guild_id/roles" Role kwargs
+@route update_guild_role_positions PATCH "/guilds/$guild_id/roles" Vector{Role} array =
+    positions
+@route update_guild_role PATCH "/guilds/$guild_id/roles/$role_id" Role kwargs
+@route delete_guild_role DELETE "/guilds/$guild_id/roles/$role_id"
+@route get_guild_prune_count GET "/guilds/$guild_id/prune" PruneCount kwargs
+@route create_guild_prunt POST "/guilds/$guild_id/prune" PruneCount kwargs
+@route get_guild_voice_regions GET "/guilds/$guild_id/regions" Vector{VoiceRegion}
+@route get_guild_invites GET "/guilds/$guild_id/invites" Vector{Invite}
+@route get_guild_integrations GET "/guilds/$guild_id/integrations" Vector{Integration}
+@route create_guild_integration POST "/guilds/$guild_id/integrations" kwargs
+@route update_guild_integration PATCH "/guilds/$guild_id/integrations/$integration_id" kwargs
+@route delete_guild_integration PATCH "/guilds/$guild_id/integrations/$integration_id"
+@route sync_guild_integration POST "/guilds/$guild_id/integrations/$integration_id/sync"
+@route get_guild_widget GET "/guilds/$guild_id/widget" GuildWidget
+@route update_guild_widget PATCH "/guilds/$guild_id/widget" GuildWidget kwargs
+@route get_guild_vanity_url GET "/guilds/$guild_id/vanity-url" Invite
+@route get_guild_widget_image GET "/guilds/$guild_id/widget.png" String
 
 RESOURCE[] = "invite"
-@route get_invite GET "/invites/$invite" Invite kwargs
-@route delete_invite DELETE "/invites/$invite" Invite
+@route get_invite GET "/invites/$invite_code" Invite kwargs
+@route delete_invite DELETE "/invites/$invite_code" Invite
 
 RESOURCE[] = "user"
-@route get_user GET "/users/$(user="@me")" User
+@route get_user GET "/users/$(user_id="@me")" User
 @route update_user PATCH "/users/@me" User kwargs
 @route get_user_guilds GET "/users/@me/guilds" Vector{Guild} kwargs
-@route leave_guild DELETE "/users/@me/guilds/$guild"
+@route leave_guild DELETE "/users/@me/guilds/$guild_id"
 @route get_user_dms GET "/users/@me/channels" Vector{DiscordChannel}
 @route create_dm POST "/users/@me/channels" DiscordChannel kwargs
 @route create_group_dm POST "/users/@me/channels" DiscordChannel kwargs
@@ -281,15 +285,28 @@ RESOURCE[] = "voice"
 @route get_voice_regions GET "/voice/regions" Vector{VoiceRegion}
 
 RESOURCE[] = "webhook"
-@route create_webhook POST "/channels/$channel/webhooks" Webhook kwargs
-@route get_channel_webhooks GET "/channels/$channel/webhooks" Vector{Webhook}
-@route get_guild_webhooks GET "/guilds/$guild/webhooks" Vector{Webhook}
-@route get_webhook GET "/webhooks/$webhook/$(token=nothing)" Webhook
-@route update_webhook PATCH "/webhooks/$webhook/$(token=nothing)" Webhook kwargs
-@route delete_webhook DELETE "/webhooks/$webhook/$(token=nothing)" Webhook kwargs
-@route execute_webhook POST "/webhooks/$webhook/$token" Message query=(wait=true,) kwargs
-@route execute_webhook_github POST "/webhooks/$webhook/$token/github" Message query=(wait=true,) kwargs
-@route execute_webhook_slack POST "/webhooks/$webhook/$token/slack" Message query=(wait=true,) kwargs
+@route create_webhook POST "/channels/$channel_id/webhooks" Webhook kwargs
+@route get_channel_webhooks GET "/channels/$channel_id/webhooks" Vector{Webhook}
+@route get_guild_webhooks GET "/guilds/$guild_id/webhooks" Vector{Webhook}
+@route get_webhook GET "/webhooks/$webhook_id/$(token=nothing)" Webhook
+@route update_webhook PATCH "/webhooks/$webhook_id/$(token=nothing)" Webhook kwargs
+@route delete_webhook DELETE "/webhooks/$webhook_id/$(token=nothing)" Webhook kwargs
+@route execute_webhook POST "/webhooks/$webhook_id/$token" Message query = (wait=true,) kwargs
+@route execute_webhook_github POST "/webhooks/$webhook_id/$token/github" Message query = (
+    wait=true,
+) kwargs
+@route execute_webhook_slack POST "/webhooks/$webhook_id/$token/slack" Message query = (
+    wait=true,
+) kwargs
 
 RESOURCE[] = "gateway"
 @route get_gateway GET "/gateway" Gateway
+
+RESOURCE[] = "sticker"
+@route get_sticker GET "/stickers/$sticker_id" Sticker
+@route list_nitro_sticker_packs GET "/sticker-packs" Vector{Sticker}
+@route list_guild_stickers GET "/guilds/$guild_id/stickers" Vector{Sticker}
+@route get_guild_sticker GET "/guilds/$guild_id/stickers/$sticker_id" Sticker
+@route create_guild_ticker POST "/guilds/$guild_id/stickers" Sticker kwargs
+@route update_guild_sticker PATCH "/guilds/$guild_id/stickers/$sticker_id" Sticker kwargs
+@route delete_guild_sticker DELETE "/guilds/$guild_id/stickers/$sticker_id"

@@ -1,5 +1,3 @@
-export BotClient, BearerClient
-
 struct Token
     token::String
 end
