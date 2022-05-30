@@ -15,4 +15,7 @@
     subscriber_count::Int
     revoked::Bool
     application::IntegrationApplication
+    # https://discord.com/developers/docs/topics/gateway#integration-create
+    # Additional fields for gateway Integration create/update events
+    guild_id::Snowflake
 end

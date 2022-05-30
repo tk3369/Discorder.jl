@@ -29,7 +29,7 @@ end
 # then a new control plane would come to live again.
 # ---------------------------------------------------------------------------
 
-function make_gateway_url(client::BotClient, version = API_VERSION)
+function make_gateway_url(client::BotClient, version=API_VERSION)
     gateway = get_gateway(client)
     return "$(gateway.url)?v=$version&encoding=json"
 end
@@ -43,7 +43,6 @@ function start_control_plane(client::BotClient=BotClient())
     local tracker
     tracker_ready = Condition()
     task = @async try
-
         gateway_url = make_gateway_url(client)
         @info "Connecting to gateway" gateway_url
 
@@ -54,7 +53,8 @@ function start_control_plane(client::BotClient=BotClient())
 
             payload = JSON3.read(json, GatewayPayload)
             @debug "Parsed" payload.op payload.d
-            payload.op == GatewayOpcode.Hello || throw(GatewayError("Wrong opcode: $(payload.op)"))
+            payload.op == GatewayOpcode.Hello ||
+                throw(GatewayError("Wrong opcode: $(payload.op)"))
 
             heartbeat_interval_ms = payload.d["heartbeat_interval"]
             tracker = GatewayTracker(; websocket, heartbeat_interval_ms)
@@ -126,23 +126,23 @@ end
 # https://discord.com/developers/docs/topics/gateway#identifying
 function send_identify(tracker::GatewayTracker)
     @info "Sending IDENTIFY payload"
-    payload = GatewayPayload(
+    payload = GatewayPayload(;
         op=GatewayOpcode.Identify,
         d=Identify(;
             token=default_token(),
             intents=Int(0x01ffff),
             properties=IdentifyConnectionProperties(;
-                os_="linux",
-                browser_="Discorder",
-                device_="Discorder"
-            )
+                os_="linux", browser_="Discorder", device_="Discorder"
+            ),
         ),
     )
-    send_payload(tracker.websocket, payload)
+    return send_payload(tracker.websocket, payload)
 end
 
 # Run control plane in a loop so that we can actually auto-recover
-function run_control_plane(; client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false)
+function run_control_plane(;
+    client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false
+)
     with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
@@ -236,10 +236,21 @@ function start_processor(tracker::GatewayTracker)
                     if payload.s isa Integer
                         tracker.seq = payload.s  # sync sequence number
                     end
-                    if !isnothing(payload.t) && !isnothing(payload.d)
+                    if payload.op === GatewayOpcode.Resume
+                        # https://discord.com/developers/docs/topics/gateway#resumed
+                        object = (; event_type="RESUME")
+                        put!(tracker.events, object)
+                    elseif payload.op === GatewayOpcode.Reconnect
+                        # https://discord.com/developers/docs/topics/gateway#reconnect
+                        object = (; event_type="RECONNECT")
+                        put!(tracker.events, object)
+                    elseif payload.op === GatewayOpcode.InvalidSession
+                        # https://discord.com/developers/docs/topics/gateway#invalid-session
+                        object = make_object("INVALID_SESSION", JSON3.write(payload.d))
+                        put!(tracker.events, object)
+                    elseif !isnothing(payload.t) && !isnothing(payload.d)
                         # TODO: this is hacky... converting it back to json string and re-parse as object
                         object = make_object(payload.t, JSON3.write(payload.d))
-                        @debug "Made object" object
                         put!(tracker.events, object)
                     end
                 else
@@ -304,7 +315,7 @@ end
 
 function stop_control_plane(tracker::GatewayTracker)
     stop_processor(tracker)
-    stop_heartbeat(tracker)
+    return stop_heartbeat(tracker)
 end
 
 is_connected(tracker::GatewayTracker) = isopen(tracker.websocket)
@@ -314,7 +325,7 @@ is_task_runnable(::Nothing) = false   # stopped tasks has `nothing` value
 
 function shutdown(tracker::GatewayTracker)
     tracker.terminate_flag = true
-    stop_control_plane(tracker)
+    return stop_control_plane(tracker)
 end
 
 function is_operational(tracker::GatewayTracker)
@@ -355,7 +366,56 @@ end
 
 function event_object_mappings()
     return Dict(
+        # https://discord.com/developers/docs/topics/gateway#ready
+        "READY" => ReadyEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#guilds
         "GUILD_CREATE" => Guild,
+        "GUILD_UPDATE" => Guild,
+        "GUILD_DELETE" => UnavailableGuild,
+        "GUILD_ROLE_CREATE" => GuildRoleCreateEvent,
+        "GUILD_ROLE_UPDATE" => GuildRoleUpdateEvent,
+        "GUILD_ROLE_DELETE" => GuildRoleDeleteEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#channels
+        "CHANNEL_CREATE" => Channel,
+        "CHANNEL_UPDATE" => Channel,
+        "CHANNEL_DELETE" => Channel,
+        "CHANNEL_PINS_UPDATE" => ChannelPinsUpdateEvent,
+        "THREAD_CREATE" => Channel,
+        "THREAD_UPDATE" => Channel,
+        "THREAD_DELETE" => Channel,
+        "THREAD_LIST_SYNC" => ThreadListSyncEvent,
+        "THREAD_MEMBER_UPDATE" => ThreadMember,
+        "THREAD_MEMBERS_UPDATE" => ThreadMembersUpdateEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#stage-instances
+        "STAGE_INSTANCE_CREATE" => StageInstance,
+        "STAGE_INSTANCE_UPDATE" => StageInstance,
+        "STAGE_INSTANCE_DELETE" => StageInstance,
+
+        # https://discord.com/developers/docs/topics/gateway#guild-member-add
+        "GUILD_MEMBER_ADD" => GuildMember,
+        "GUILD_MEMBER_UPDATE" => GuildMemberUpdateEvent,
+        "GUILD_MEMBER_REMOVE" => GuildMemberRemoveEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#guild-ban-add
+        "GUILD_BAN_ADD" => GuildBanAddEvent,
+        "GUILD_BAN_REMOVE" => GuildBanRemoveEvent,
+        "GUILD_EMOJIS_UPDATE" => GuildEmojisUpdateEvent,
+        "GUILD_STICKERS_UPDATE" => GuildStickersUpdateEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#guild-integrations-update
+        "GUILD_INTEGRATIONS_UPDATE" => GuildIntegrationsUpdateEvent,
+        "INTEGRATION_CREATE" => Integration,
+        "INTEGRATION_UPDATE" => Integration,
+        "INTEGRATION_DELETE" => IntegrationDeleteEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#invites
+        "INVITE_CREATE" => InviteCreateEvent,
+        "INVITE_DELETE" => InviteDeleteEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#presence
         "PRESENCE_UPDATE" => PresenceUpdateEvent,
 
         # https://discord.com/developers/docs/topics/gateway#messages
@@ -369,17 +429,26 @@ function event_object_mappings()
         "MESSAGE_REACTION_REMOVE" => MessageReactionRemoveEvent,
         "MESSAGE_REACTION_REMOVE_ALL" => MessageReactionRemoveAllEvent,
         "MESSAGE_REACTION_REMOVE_EMOJI" => MessageReactionRemoveEmojiEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#typing-start
+        "TYPING_START" => TypingStartEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#guild-scheduled-event-create
+        "GUILD_SCHEDULED_EVENT_CREATE" => GuildScheduledEvent,
+        "GUILD_SCHEDULED_EVENT_UPDATE" => GuildScheduledEvent,
+        "GUILD_SCHEDULED_EVENT_DELETE" => GuildScheduledEvent,
+        "GUILD_SCHEDULED_EVENT_USER_ADD" => GuildScheduledEventUserAddEvent,
+        "GUILD_SCHEDULED_EVENT_USER_REMOVE" => GuildScheduledEventUserRemoveEvent,
     )
 end
 
 function make_object(event_type::AbstractString, json::Optional{AbstractString})
     mappings = event_object_mappings()
-    if haskey(mappings, event_type)
-        T = mappings[event_type]
+    T = haskey(mappings, event_type) ? mappings[event_type] : Any
+    try
         object = JSON3.read(json, T)
-    else
-        # return (potentially-nested) Dict's
-        object = JSON3.read(json, Any)
+        return (; event_type, object)
+    catch ex
+        @error "Unable to parse JSON string" json T event_type ex
     end
-    return (; event_type, object)
 end

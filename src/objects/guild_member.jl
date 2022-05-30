@@ -11,4 +11,7 @@
     pending::Bool
     permissions::Permissions
     communication_disabled_until::Timestamp
+    # https://discord.com/developers/docs/topics/gateway#guild-member-add
+    # Additional fields for Guild Member Add event
+    guild_id::Snowflake
 end

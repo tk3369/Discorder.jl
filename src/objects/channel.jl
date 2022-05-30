@@ -27,4 +27,8 @@
     default_auto_archive_duration::Int
     permissions::Permissions
     flags::Int
+    # https://discord.com/developers/docs/topics/gateway#thread-create
+    # Additional fields when new thread is created
+    newly_created::Bool
+    member::ThreadMember
 end

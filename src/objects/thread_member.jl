@@ -4,4 +4,7 @@
     user_id::Snowflake
     join_timestamp::Timestamp
     flags::Int
+    # https://discord.com/developers/docs/topics/gateway#thread-member-update
+    # Additional fields for Thread Member Update event
+    guild_id::Snowflake
 end

@@ -1,3 +1,4 @@
+# https://discord.com/developers/docs/resources/application#application-object
 @discord_object struct Application
     id::Snowflake
     name::String
