@@ -17,7 +17,7 @@ function Timestamp(s::AbstractString)
     end
 end
 
-Base.show(io::IO, s::Timestamp) = print(io, Dates.format(s.dt, json_timestamp_format()))
+Base.show(io::IO, s::Timestamp) = print(io, format(s.dt, json_timestamp_format()))
 StructTypes.StructType(::Type{Timestamp}) = StructTypes.StringType()
 HTTP.escapeuri(s::Timestamp) = escapeuri(s.dt)
 

@@ -26,7 +26,7 @@ debugging purpose.
 """
 function show_error(ex::Exception)
     bt = Base.catch_backtrace()
-    Base.showerror(stderr, ex, )
+    return Base.showerror(stderr, ex)
 end
 
 """
@@ -39,13 +39,14 @@ injected.
 - `debug`: turn on debug logging (default = `false`)
 - `filename`: name of log file (default = `"Discorder.log"`)
 """
-function get_logger(; debug = false, filename = "Discorder.log")
-    timestamp_logger(logger) =
+function get_logger(; debug=false, filename="Discorder.log")
+    function timestamp_logger(logger)
         TransformerLogger(logger) do log
             current_time = now(localzone())
-            log = merge(log, (; kwargs = (log.kwargs..., :current_time => current_time)))
+            log = merge(log, (; kwargs=(log.kwargs..., :current_time => current_time)))
             return log
         end
+    end
     level = debug ? Logging.Debug : Logging.Info
     return timestamp_logger(MinLevelLogger(FileLogger(filename), level))
 end

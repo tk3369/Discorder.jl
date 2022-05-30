@@ -1,19 +1,66 @@
-# Gateway tracker
+struct Event{S<:AbstractString,T}
+    type::S
+    data::T
+    timestamp::ZonedDateTime
+end
+
+Event(type::AbstractString, data::T=nothing) where {T} = Event(type, data, now(localzone()))
+
+Base.show(io::IO, e::Event) = print(io, string(e.timestamp), " ", e.type)
+
+"""
+    GatewayTracker
+
+GatewayTracker is a stateful object used by the Control Pane.
+"""
 @with_kw mutable struct GatewayTracker
-    websocket::HTTP.WebSockets.WebSocket
-    heartbeat_interval_ms::Int
+    "The websocket connection to Discord gateway."
+    websocket::Optional{HTTP.WebSockets.WebSocket} = nothing
+
+    "The approximate time in milliseconds between every heartbeat."
+    heartbeat_interval_ms::Int = 60_000
+
+    "The sequence number for keeping track of received messages from gateway."
     seq::Int = -1
+
+    "Background task for sending heartbeat messages."
     heartbeat_task::Optional{Task} = nothing
+
+    "Background task for receiving and processing incoming messages."
     processor_task::Optional{Task} = nothing
+
+    "Foreground task that runs the main loop."
     master_task::Optional{Task} = nothing
+
+    "Background maintenance task for detecting and recovering from connection problems."
     doctor_task::Optional{Task} = nothing
+
+    "An internal flag to terminate the control pane. Do not use."
     terminate_flag::Bool = false
+
+    "The `ready` flag is set to `true` after the gateway has been connected."
     ready::Bool = false
-    events::Channel = Channel{Any}(100)
+
+    """
+    The `events` channel is used for communicating gateway events to end users.
+    """
+    events::Channel = Channel{Event}(1000)
+
+    """
+    Throw exception and exit control pane when any exception is encountered.
+    This is useful for during development. When this is set to false, exceptions
+    are generally swallowed but reported so they appear in the log file.
+    """
+    fail_on_error::Bool = true
 end
 
 struct GatewayError <: Exception
     message::String
+end
+
+function make_gateway_url(client::BotClient, version=API_VERSION)
+    gateway = get_gateway(client)
+    return "$(gateway.url)?v=$version&encoding=json"
 end
 
 # ---------------------------------------------------------------------------
@@ -29,9 +76,33 @@ end
 # then a new control plane would come to live again.
 # ---------------------------------------------------------------------------
 
-function make_gateway_url(client::BotClient, version=API_VERSION)
-    gateway = get_gateway(client)
-    return "$(gateway.url)?v=$version&encoding=json"
+"""
+    run_control_plane(;
+        client::BotClient=BotClient(),
+        tracker_ref=Ref{GatewayTracker}(),
+        debug=false
+    )
+
+Run control plane in a loop so that we can actually auto-recover
+"""
+function run_control_plane(;
+    client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false
+)
+    with_logger(get_logger(; debug)) do
+        while true
+            @info "Starting a new control plane"
+            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client)
+            @info "Started control plane" elapsed_seconds
+            safe_wait(tracker, tracker_ref[].master_task)
+            if tracker_ref[].terminate_flag
+                break
+            elseif tracker_ref[].fail_on_error
+                @info "Exiting control pane due to previous failure"
+                break
+            end
+        end
+        @info "Control plan has been fully shut down"
+    end
 end
 
 """
@@ -40,25 +111,31 @@ end
 Start new control plane and return a `GatewayTracker` object.
 """
 function start_control_plane(client::BotClient=BotClient())
-    local tracker
+    tracker = GatewayTracker()
     tracker_ready = Condition()
     task = @async try
         gateway_url = make_gateway_url(client)
         @info "Connecting to gateway" gateway_url
 
         HTTP.WebSockets.open(gateway_url) do websocket
-            json = readavailable(websocket)
-            @debug "Received" String(deepcopy(json))
+            tracker.websocket = websocket
+
+            # https://discord.com/developers/docs/topics/gateway#connecting
+            # Once connected, the client should immediately receive an Opcode 10 Hello payload
+            json = String(readavailable(websocket))
+            @debug "Received" json
             isempty(json) && throw(GatewayError("No data was received"))
 
-            payload = JSON3.read(json, GatewayPayload)
+            payload = safe_parse_json(tracker, json, GatewayPayload)
+            isnothing(payload) && throw(GatewayError("Unable to parse payload"))
+
             @debug "Parsed" payload.op payload.d
             payload.op == GatewayOpcode.Hello ||
-                throw(GatewayError("Wrong opcode: $(payload.op)"))
+                throw(GatewayError("Wrong gateway opcode: $(payload.op)"))
 
-            heartbeat_interval_ms = payload.d["heartbeat_interval"]
-            tracker = GatewayTracker(; websocket, heartbeat_interval_ms)
+            tracker.heartbeat_interval_ms = payload.d["heartbeat_interval"]
 
+            # https://discord.com/developers/docs/topics/gateway#identifying
             send_identify(tracker)
 
             @debug "Starting heartbeat and processor tasks"
@@ -69,19 +146,20 @@ function start_control_plane(client::BotClient=BotClient())
             @debug "Waiting for heartbeat and processor tasks"
             @debug "heartbeat_task = $(tracker.heartbeat_task)"
             @debug "processor_task = $(tracker.processor_task)"
-            safe_wait(tracker.heartbeat_task)
-            safe_wait(tracker.processor_task)
+            safe_wait(tracker, tracker.heartbeat_task)
+            safe_wait(tracker, tracker.processor_task)
 
             @info "Finished control plane process"
         end
     catch ex
         @error "Unable to start control plane (phase 1): $ex"
         show_error(ex)
+        fail_on_error && rethrow(ex)
     end
 
     try
         @debug "Waiting for tracker to be ready"
-        safe_wait(tracker_ready)
+        safe_wait(tracker, tracker_ready)
 
         tracker.master_task = task
 
@@ -100,21 +178,9 @@ function start_control_plane(client::BotClient=BotClient())
     catch ex
         @error "Unable to start control plane (phase 2): $ex"
         show_error(ex)
+        fail_on_error && rethrow(ex)
     end
     return tracker
-end
-
-function safe_wait(task)
-    try
-        wait(task)
-    catch ex
-        if ex isa MethodError && length(ex.args) > 0 && isnothing(ex.args[1])
-            @warn "Task already be set to nothing by control plane doctor?"
-        else
-            @warn "Unable to wait for task" ex
-            show_error(ex)
-        end
-    end
 end
 
 function default_token()
@@ -136,23 +202,7 @@ function send_identify(tracker::GatewayTracker)
             ),
         ),
     )
-    return send_payload(tracker.websocket, payload)
-end
-
-# Run control plane in a loop so that we can actually auto-recover
-function run_control_plane(;
-    client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false
-)
-    with_logger(get_logger(; debug)) do
-        while true
-            @info "Starting a new control plane"
-            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client)
-            @info "Started control plane" elapsed_seconds
-            safe_wait(tracker_ref[].master_task)
-            tracker_ref[].terminate_flag && break
-        end
-        @info "Control plan has been fully shut down"
-    end
+    return send_payload(tracker, payload)
 end
 
 # The doctor is responsible for ensuring the healthiness of the control plane.
@@ -161,8 +211,8 @@ function start_doctor(tracker::GatewayTracker)
         while true
             if !is_operational(tracker)
                 @info "Gateway is not healthy, stopping control plane" tracker
-                sleep(5)
-                stop_control_plane(tracker)
+                sleep(1)
+                stop_control_plane(tracker, "auto recovery")
                 break
             end
             sleep(1)
@@ -170,20 +220,21 @@ function start_doctor(tracker::GatewayTracker)
     catch ex
         @error "Unexpected exception in doctor task: $ex"
         show_error(ex)
+        tracker.fail_on_error && rethrow(ex)
     end
     return tracker.doctor_task
 end
 
-function send_payload(ws::HTTP.WebSockets.WebSocket, payload::GatewayPayload)
+function send_payload(tracker::GatewayTracker, payload::GatewayPayload)
     try
         str = json(payload)
         @debug "Sending payload" str
-        write(ws, str)
+        write(tracker.websocket, str)
         @debug "Finished sending payload"
     catch ex
         @error "Unable to send gateway payload: $ex"
         show_error(ex)
-        rethrow(ex)
+        tracker.fail_on_error && rethrow(ex)
     end
     return nothing
 end
@@ -200,7 +251,7 @@ function start_heartbeat(tracker::GatewayTracker)
             # https://discord.com/developers/docs/topics/gateway#heartbeat
             seq = tracker.seq < 0 ? nothing : tracker.seq
             payload = GatewayPayload(; op=GatewayOpcode.Heartbeat, d=seq)
-            send_payload(tracker.websocket, payload)
+            send_payload(tracker, payload)
             jitter = rand()  # should be between 0 and 1 per API Reference
             nap = tracker.heartbeat_interval_ms / 1000 * jitter
             @info "Sent heartbeat, taking nap now." nap
@@ -213,12 +264,15 @@ function start_heartbeat(tracker::GatewayTracker)
         else
             @error "Heartbeat loop exited with error" ex
             show_error(ex)
+            tracker.fail_on_error && rethrow(ex)
         end
     end
     return tracker.heartbeat_task
 end
 
-stop_heartbeat(tracker::GatewayTracker) = stop_task(tracker, :heartbeat_task)
+function stop_heartbeat(tracker::GatewayTracker, reason::String)
+    return stop_task(tracker, :heartbeat_task, reason)
+end
 
 # ---------------------------------------------------------------------------
 # Processor
@@ -228,30 +282,35 @@ function start_processor(tracker::GatewayTracker)
     tracker.processor_task = @async try
         while true
             if isopen(tracker.websocket)
-                json = readavailable(tracker.websocket)
-                @debug "Received" String(deepcopy(json))
+                json = String(readavailable(tracker.websocket))
+                @debug "Received" json
                 if !isempty(json)
-                    payload = JSON3.read(json, GatewayPayload)
+                    payload = safe_parse_json(tracker, json, GatewayPayload)
+                    # If there's any parsing issue then continue loop
+                    # TODO perhaps the Discorder user should have an option to throw?
+                    isnothing(payload) && continue
                     @debug "Parsed" payload.op payload.t payload.d payload.s
                     if payload.s isa Integer
                         tracker.seq = payload.s  # sync sequence number
                     end
                     if payload.op === GatewayOpcode.Resume
                         # https://discord.com/developers/docs/topics/gateway#resumed
-                        object = (; event_type="RESUME")
+                        object = Event("RESUME")
                         put!(tracker.events, object)
                     elseif payload.op === GatewayOpcode.Reconnect
                         # https://discord.com/developers/docs/topics/gateway#reconnect
-                        object = (; event_type="RECONNECT")
+                        object = Event("RECONNECT")
                         put!(tracker.events, object)
+                        stop_control_plane(tracker, "Discord wants me to reconnect")
                     elseif payload.op === GatewayOpcode.InvalidSession
                         # https://discord.com/developers/docs/topics/gateway#invalid-session
-                        object = make_object("INVALID_SESSION", JSON3.write(payload.d))
-                        put!(tracker.events, object)
+                        object = make_object(
+                            tracker, "INVALID_SESSION", JSON3.write(payload.d)
+                        )
+                        !isnothing(object) && put!(tracker.events, object)
                     elseif !isnothing(payload.t) && !isnothing(payload.d)
-                        # TODO: this is hacky... converting it back to json string and re-parse as object
-                        object = make_object(payload.t, JSON3.write(payload.d))
-                        put!(tracker.events, object)
+                        object = make_object(tracker, payload.t, JSON3.write(payload.d))
+                        !isnothing(object) && put!(tracker.events, object)
                     end
                 else
                     @error "Received empty array"
@@ -268,12 +327,15 @@ function start_processor(tracker::GatewayTracker)
         else
             @error "Processor loop error" ex
             show_error(ex)
+            tracker.fail_on_error && rethrow(ex)
         end
     end
     return tracker.processor_task
 end
 
-stop_processor(tracker::GatewayTracker) = stop_task(tracker, :processor_task)
+function stop_processor(tracker::GatewayTracker, reason::String)
+    return stop_task(tracker, :processor_task, reason)
+end
 
 # ---------------------------------------------------------------------------
 # Control plane utils
@@ -281,13 +343,13 @@ stop_processor(tracker::GatewayTracker) = stop_task(tracker, :processor_task)
 
 # General function that can be used to stop any tasks in the GatewayTracker
 # Return `true` if the task has been stopped successfully.
-function stop_task(tracker::GatewayTracker, task_field::Symbol)
+function stop_task(tracker::GatewayTracker, task_field::Symbol, reason::String)
     task = getproperty(tracker, task_field)
     if isnothing(task)
-        @info "Task does not exist anymore" task_field
+        @info "Task does not exist anymore" task_field reason
         return true
     end
-    @info "Stopping task" task_field task
+    @info "Stopping task" task_field task reason
     wait_seconds = 5
     sleep_time = 0.1
     max_iterations = wait_seconds / sleep_time
@@ -309,13 +371,15 @@ function stop_task(tracker::GatewayTracker, task_field::Symbol)
     catch ex
         @error "Unexpected exception while stopping task" ex task_field task
         show_error(ex)
+        tracker.fail_on_error && rethrow(ex)
         return false
     end
 end
 
-function stop_control_plane(tracker::GatewayTracker)
-    stop_processor(tracker)
-    return stop_heartbeat(tracker)
+function stop_control_plane(tracker::GatewayTracker, reason::String)
+    stop_processor(tracker, reason)
+    stop_heartbeat(tracker, reason)
+    return nothing
 end
 
 is_connected(tracker::GatewayTracker) = isopen(tracker.websocket)
@@ -325,7 +389,8 @@ is_task_runnable(::Nothing) = false   # stopped tasks has `nothing` value
 
 function shutdown(tracker::GatewayTracker)
     tracker.terminate_flag = true
-    return stop_control_plane(tracker)
+    stop_control_plane(tracker, "graceful shutdown")
+    return nothing
 end
 
 function is_operational(tracker::GatewayTracker)
@@ -378,13 +443,13 @@ function event_object_mappings()
         "GUILD_ROLE_DELETE" => GuildRoleDeleteEvent,
 
         # https://discord.com/developers/docs/topics/gateway#channels
-        "CHANNEL_CREATE" => Channel,
-        "CHANNEL_UPDATE" => Channel,
-        "CHANNEL_DELETE" => Channel,
+        "CHANNEL_CREATE" => DiscordChannel,
+        "CHANNEL_UPDATE" => DiscordChannel,
+        "CHANNEL_DELETE" => DiscordChannel,
         "CHANNEL_PINS_UPDATE" => ChannelPinsUpdateEvent,
         "THREAD_CREATE" => Channel,
-        "THREAD_UPDATE" => Channel,
-        "THREAD_DELETE" => Channel,
+        "THREAD_UPDATE" => DiscordChannel,
+        "THREAD_DELETE" => DiscordChannel,
         "THREAD_LIST_SYNC" => ThreadListSyncEvent,
         "THREAD_MEMBER_UPDATE" => ThreadMember,
         "THREAD_MEMBERS_UPDATE" => ThreadMembersUpdateEvent,
@@ -439,16 +504,70 @@ function event_object_mappings()
         "GUILD_SCHEDULED_EVENT_DELETE" => GuildScheduledEvent,
         "GUILD_SCHEDULED_EVENT_USER_ADD" => GuildScheduledEventUserAddEvent,
         "GUILD_SCHEDULED_EVENT_USER_REMOVE" => GuildScheduledEventUserRemoveEvent,
+
+        # https://discord.com/developers/docs/topics/gateway#voice-state-update
+        "VOICE_STATE_UPDATE" => VoiceState,
+        "VOICE_SERVER_UPDATE" => VoiceServerUpdateEvent,
     )
 end
 
-function make_object(event_type::AbstractString, json::Optional{AbstractString})
+function parse_event(
+    tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString}
+)
     mappings = event_object_mappings()
     T = haskey(mappings, event_type) ? mappings[event_type] : Any
+    object = safe_parse_json(tracker, json, T)
+    isnothing(object) && @error "Skipping event due to parsing issue" event_type json
+    return object
+end
+
+"""
+    make_object(tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString})
+
+Create an event object.
+"""
+function make_object(
+    tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString}
+)
+    object = parse_event(tracker, event_type, json)
+    return Event(event_type, object)
+end
+
+"""
+    safe_parse_json(tracker::GatewayTracker, json::AbstractString, T::DataType)
+
+Parse a JSON string into an expected type `T`, which is configured using StructType traits.
+Returns `nothing` if the string cannot be parsed for some reasons. Throw exception only
+during `fail_on_error` mode.
+"""
+function safe_parse_json(tracker::GatewayTracker, json::AbstractString, T::DataType)
     try
-        object = JSON3.read(json, T)
-        return (; event_type, object)
+        return JSON3.read(json, T)
     catch ex
-        @error "Unable to parse JSON string" json T event_type ex
+        @error "Unable to parse JSON string" json T ex
+        show_error(ex)
+        tracker.fail_on_error && rethrow(ex)
     end
+    return nothing
+end
+
+"""
+    safe_wait(task::Optional{Task})
+
+Wait for a task for finish synchronously. Unlike `wait`, it is meant to be safe and never
+throw, except during `fail_on_error` mode. Always return `nothing`.
+"""
+function safe_wait(tracker::GatewayTracker, task)
+    if isnothing(task)
+        @warn "Task already be set to nothing by control plane doctor?"
+    else
+        try
+            wait(task)
+        catch ex
+            @error "Unable to wait for task" task ex
+            show_error(ex)
+            fail_on_error && rethrow(ex)
+        end
+    end
+    return nothing
 end
