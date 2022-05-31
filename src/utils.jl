@@ -50,3 +50,12 @@ function get_logger(; debug=false, filename="Discorder.log")
     level = debug ? Logging.Debug : Logging.Info
     return timestamp_logger(MinLevelLogger(FileLogger(filename), level))
 end
+
+"""
+    sanitize(s::AbstractString)
+
+Remove sensitive information such as Bot token.
+"""
+function sanitize(s::AbstractString)
+    return replace(s, r"(\"token\":\")[^\"]+(\")" => s"\1xxxxxxxx\2")
+end

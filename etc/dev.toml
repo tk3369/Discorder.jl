@@ -1,0 +1,4 @@
+[gateway]
+fail_on_error = true
+event_queue_size = 256
+debug = true

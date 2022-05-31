@@ -7,7 +7,11 @@ GatewayTracker is a stateful object used by the Control Pane.
     "The websocket connection to Discord gateway."
     websocket::Optional{HTTP.WebSockets.WebSocket} = nothing
 
-    "The approximate time in milliseconds between every heartbeat."
+    """
+    The approximate time in milliseconds between every heartbeat. While it has a
+    default value, the interval is normally established with the suggested value
+    after connecting to the gateway.
+    """
     heartbeat_interval_ms::Int = 60_000
 
     "The sequence number for keeping track of received messages from gateway."
@@ -34,14 +38,42 @@ GatewayTracker is a stateful object used by the Control Pane.
     """
     The `events` channel is used for communicating gateway events to end users.
     """
-    events::Channel = Channel{Event}(1000)
+    events::Channel = Channel{Event}()
 
     """
     Throw exception and exit control pane when any exception is encountered.
     This is useful for during development. When this is set to false, exceptions
     are generally swallowed but reported so they appear in the log file.
     """
-    fail_on_error::Bool = true
+    fail_on_error::Bool = false
+end
+
+function GatewayTracker(config)
+    isnothing(config) && return GatewayTracker()
+    fail_on_error = get_config(config, "fail_on_error")
+    event_queue_size = get_config(config, "event_queue_size")
+    events = Channel{Event}(event_queue_size)
+    return GatewayTracker(; fail_on_error, events)
+end
+
+function get_config(config, key)
+    # default config mimics production settings
+    default_config = Dict(
+        "fail_on_error" => true, "event_queue_size" => 1024, "debug" => false
+    )
+    return haskey(config, key) ? config[key] : default_config[key]
+end
+
+function read_gateway_config(config_file_path::AbstractString)
+    try
+        config = TOML.parse(String(read(config_file_path)))
+        gateway_config = config["gateway"]
+        @info "Gateway config settings" gateway_config
+        return gateway_config
+    catch ex
+        @error "Unable to read gateway config" config_file_path ex
+        error("Unable to read gateway config ($config_file_path): $ex")
+    end
 end
 
 struct GatewayError <: Exception
@@ -70,38 +102,49 @@ end
     run_control_plane(;
         client::BotClient=BotClient(),
         tracker_ref=Ref{GatewayTracker}(),
-        debug=false
+        config_file_path::Optional{AbstractString}=nothing,
     )
 
-Run control plane in a loop so that we can actually auto-recover
+Run control plane in a loop so that we can actually auto-recover when
+bad things happen.
 """
 function run_control_plane(;
-    client::BotClient=BotClient(), tracker_ref=Ref{GatewayTracker}(), debug=false
+    client::BotClient=BotClient(),
+    tracker_ref=Ref{GatewayTracker}(),
+    config_file_path::Optional{AbstractString}=nothing,
 )
+    if !isnothing(config_file_path)
+        config = read_gateway_config(config_file_path)
+        debug = get_config(config, "debug")
+    else
+        config = nothing
+        debug = false
+    end
     with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
-            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client)
+            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
             @info "Started control plane" elapsed_seconds
-            safe_wait(tracker, tracker_ref[].master_task)
+            safe_wait(tracker, tracker_ref[].master_task, :master)
             if tracker_ref[].terminate_flag
+                @info "Terminate flag is set to true, exiting control pane loop."
                 break
             elseif tracker_ref[].fail_on_error
-                @info "Exiting control pane due to previous failure"
+                @info "Fail on error flag is set to true, exiting control pane loop."
                 break
             end
         end
-        @info "Control plan has been fully shut down"
+        @info "Control plan has been shut down completely."
     end
 end
 
 """
-    start_control_plane(client::BotClient)
+    start_control_plane(client::BotClient, config)
 
 Start new control plane and return a `GatewayTracker` object.
 """
-function start_control_plane(client::BotClient=BotClient())
-    tracker = GatewayTracker()
+function start_control_plane(client::BotClient, config)
+    tracker = GatewayTracker(config)
     tracker_ready = Condition()
     task = @async try
         gateway_url = make_gateway_url(client)
@@ -136,10 +179,10 @@ function start_control_plane(client::BotClient=BotClient())
             @debug "Waiting for heartbeat and processor tasks"
             @debug "heartbeat_task = $(tracker.heartbeat_task)"
             @debug "processor_task = $(tracker.processor_task)"
-            safe_wait(tracker, tracker.heartbeat_task)
-            safe_wait(tracker, tracker.processor_task)
+            safe_wait(tracker, tracker.heartbeat_task, :heartbeat)
+            safe_wait(tracker, tracker.processor_task, :processor)
 
-            @info "Finished control plane process"
+            @info "Finished master task"
         end
     catch ex
         @error "Unable to start control plane (phase 1): $ex"
@@ -149,7 +192,7 @@ function start_control_plane(client::BotClient=BotClient())
 
     try
         @debug "Waiting for tracker to be ready"
-        safe_wait(tracker, tracker_ready)
+        safe_wait(tracker, tracker_ready, :init_process)
 
         tracker.master_task = task
 
@@ -207,6 +250,7 @@ function start_doctor(tracker::GatewayTracker)
             end
             sleep(1)
         end
+        @info "Finished doctor task"
     catch ex
         @error "Unexpected exception in doctor task: $ex"
         show_error(ex)
@@ -218,7 +262,7 @@ end
 function send_payload(tracker::GatewayTracker, payload::GatewayPayload)
     try
         str = json(payload)
-        @debug "Sending payload" str
+        @debug "Sending payload" sanitize(str)
         write(tracker.websocket, str)
         @debug "Finished sending payload"
     catch ex
@@ -247,12 +291,12 @@ function start_heartbeat(tracker::GatewayTracker)
             @info "Sent heartbeat, taking nap now." nap
             sleep(nap)
         end
-        @debug "Finished heartbeat loop"
+        @debug "Finished heartbeat task"
     catch ex
         if ex isa InterruptException
-            @info "Heartbeat loop stopped by control plane"
+            @info "Heartbeat task stopped by control plane"
         else
-            @error "Heartbeat loop exited with error" ex
+            @error "Heartbeat task exited with error" ex
             show_error(ex)
             tracker.fail_on_error && rethrow(ex)
         end
@@ -311,6 +355,7 @@ function start_processor(tracker::GatewayTracker)
                 break
             end
         end
+        @info "Finished processor task"
     catch ex
         if ex isa InterruptException
             @info "Processor loop stopped by control plane"
@@ -547,14 +592,14 @@ end
 Wait for a task for finish synchronously. Unlike `wait`, it is meant to be safe and never
 throw, except during `fail_on_error` mode. Always return `nothing`.
 """
-function safe_wait(tracker::GatewayTracker, task)
+function safe_wait(tracker::GatewayTracker, task, label)
     if isnothing(task)
-        @warn "Task already be set to nothing by control plane doctor?"
+        @warn "Task already be set to nothing by control plane doctor?" task label
     else
         try
             wait(task)
         catch ex
-            @error "Unable to wait for task" task ex
+            @error "Unable to wait for task" task ex label
             show_error(ex)
             fail_on_error && rethrow(ex)
         end

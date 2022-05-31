@@ -6,6 +6,7 @@ using Base.Iterators: Pairs
 
 using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
 using Logging: Logging, with_logger
+using TOML: TOML
 
 using EnumX: @enumx
 using HTTP: HTTP, Form, Response, StatusError, escapeuri, header, request
