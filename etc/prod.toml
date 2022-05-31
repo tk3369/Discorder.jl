@@ -2,3 +2,4 @@
 fail_on_error = false
 event_queue_size = 1024
 debug = false
+log_heartbeat = false

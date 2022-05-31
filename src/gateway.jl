@@ -32,13 +32,10 @@ GatewayTracker is a stateful object used by the Control Pane.
     "An internal flag to terminate the control pane. Do not use."
     terminate_flag::Bool = false
 
-    "The `ready` flag is set to `true` after the gateway has been connected."
-    ready::Bool = false
-
     """
     The `events` channel is used for communicating gateway events to end users.
     """
-    events::Channel = Channel{Event}()
+    events::Channel{Event}
 
     """
     Throw exception and exit control pane when any exception is encountered.
@@ -46,21 +43,30 @@ GatewayTracker is a stateful object used by the Control Pane.
     are generally swallowed but reported so they appear in the log file.
     """
     fail_on_error::Bool = false
+
+    """
+    Configuration settings. This is typically injected from reading a TOML file.
+    """
+    config::Dict
 end
 
-function GatewayTracker(config)
-    isnothing(config) && return GatewayTracker()
+function GatewayTracker(config::Optional{Dict})
     fail_on_error = get_config(config, "fail_on_error")
     event_queue_size = get_config(config, "event_queue_size")
     events = Channel{Event}(event_queue_size)
-    return GatewayTracker(; fail_on_error, events)
+    return GatewayTracker(; fail_on_error, events, config)
 end
 
-function get_config(config, key)
+function get_config(config::Optional{Dict}, key::AbstractString)
     # default config mimics production settings
     default_config = Dict(
-        "fail_on_error" => true, "event_queue_size" => 1024, "debug" => false
+        "fail_on_error" => false,
+        "event_queue_size" => 1024,
+        "debug" => false,
+        "log_heartbeat" => false,
+        "throttle_seconds_between_restart" => 1,
     )
+    isnothing(config) && return default_config[key]
     return haskey(config, key) ? config[key] : default_config[key]
 end
 
@@ -68,7 +74,7 @@ function read_gateway_config(config_file_path::AbstractString)
     try
         config = TOML.parse(String(read(config_file_path)))
         gateway_config = config["gateway"]
-        @info "Gateway config settings" gateway_config
+        # @info "Gateway config settings" gateway_config
         return gateway_config
     catch ex
         @error "Unable to read gateway config" config_file_path ex
@@ -125,7 +131,12 @@ function run_control_plane(;
             @info "Starting a new control plane"
             elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
             @info "Started control plane" elapsed_seconds
-            safe_wait(tracker, tracker_ref[].master_task, :master)
+            try
+                wait(tracker_ref[].master_task)
+            catch ex
+                ex isa TaskFailedException && @error "Control plane failed" ex
+            end
+            @info "Control plane is finished"
             if tracker_ref[].terminate_flag
                 @info "Terminate flag is set to true, exiting control pane loop."
                 break
@@ -133,8 +144,10 @@ function run_control_plane(;
                 @info "Fail on error flag is set to true, exiting control pane loop."
                 break
             end
+            sleep(get_config(config, "throttle_seconds_between_restart"))
+            @info "Going to recover"
         end
-        @info "Control plan has been shut down completely."
+        @info "Control plane has been shut down completely."
     end
 end
 
@@ -145,24 +158,23 @@ Start new control plane and return a `GatewayTracker` object.
 """
 function start_control_plane(client::BotClient, config)
     tracker = GatewayTracker(config)
-    tracker_ready = Condition()
     task = @async try
         gateway_url = make_gateway_url(client)
         @info "Connecting to gateway" gateway_url
 
-        HTTP.WebSockets.open(gateway_url) do websocket
+        HTTP.WebSockets.open(gateway_url; retry=false) do websocket
             tracker.websocket = websocket
 
             # https://discord.com/developers/docs/topics/gateway#connecting
             # Once connected, the client should immediately receive an Opcode 10 Hello payload
             json = String(readavailable(websocket))
-            @debug "Received" json
+            @debug "Received first gateway message" json
             isempty(json) && throw(GatewayError("No data was received"))
 
             payload = safe_parse_json(tracker, json, GatewayPayload)
             isnothing(payload) && throw(GatewayError("Unable to parse payload"))
 
-            @debug "Parsed" payload.op payload.d
+            @debug "Parsed first gateway message" payload.op payload.d
             payload.op == GatewayOpcode.Hello ||
                 throw(GatewayError("Wrong gateway opcode: $(payload.op)"))
 
@@ -174,7 +186,16 @@ function start_control_plane(client::BotClient, config)
             @debug "Starting heartbeat and processor tasks"
             start_heartbeat(tracker)
             start_processor(tracker)
-            notify(tracker_ready)
+
+            # make sure everything is up and running before starting doctor process
+            wait_for_task_to_get_scheduled(tracker.heartbeat_task, :heartbeat)
+            wait_for_task_to_get_scheduled(tracker.processor_task, :processor)
+
+            @debug "Starting doctor task"
+            start_doctor(tracker)
+            wait_for_task_to_get_scheduled(tracker.doctor_task, :doctor)
+
+            @info "Control plane started successfully" tracker
 
             @debug "Waiting for heartbeat and processor tasks"
             @debug "heartbeat_task = $(tracker.heartbeat_task)"
@@ -185,34 +206,11 @@ function start_control_plane(client::BotClient, config)
             @info "Finished master task"
         end
     catch ex
-        @error "Unable to start control plane (phase 1): $ex"
+        @error "Unable to start control plane" ex
         show_error(ex)
         fail_on_error && rethrow(ex)
     end
-
-    try
-        @debug "Waiting for tracker to be ready"
-        safe_wait(tracker, tracker_ready, :init_process)
-
-        tracker.master_task = task
-
-        # make sure everything is up and running before starting doctor process
-        @debug "Waiting for heartbeat task to get started"
-        wait_for_task_to_get_scheduled(tracker.heartbeat_task, :heartbeat)
-
-        @debug "Waiting for processor task to get started"
-        wait_for_task_to_get_scheduled(tracker.processor_task, :processor)
-
-        @debug "Starting doctor task"
-        start_doctor(tracker)
-        wait_for_task_to_get_scheduled(tracker.doctor_task, :doctor)
-
-        @info "Control plane started successfully" tracker
-    catch ex
-        @error "Unable to start control plane (phase 2): $ex"
-        show_error(ex)
-        fail_on_error && rethrow(ex)
-    end
+    tracker.master_task = task
     return tracker
 end
 
@@ -244,7 +242,6 @@ function start_doctor(tracker::GatewayTracker)
         while true
             if !is_operational(tracker)
                 @info "Gateway is not healthy, stopping control plane" tracker
-                sleep(1)
                 stop_control_plane(tracker, "auto recovery")
                 break
             end
@@ -288,7 +285,9 @@ function start_heartbeat(tracker::GatewayTracker)
             send_payload(tracker, payload)
             jitter = rand()  # should be between 0 and 1 per API Reference
             nap = tracker.heartbeat_interval_ms / 1000 * jitter
-            @info "Sent heartbeat, taking nap now." nap
+            if get_config(tracker.config, "log_heartbeat")
+                @info "Sent heartbeat, taking nap now." nap
+            end
             sleep(nap)
         end
         @debug "Finished heartbeat task"
@@ -317,13 +316,13 @@ function start_processor(tracker::GatewayTracker)
         while true
             if isopen(tracker.websocket)
                 json = String(readavailable(tracker.websocket))
-                @debug "Received" json
+                @debug "Received event" json
                 if !isempty(json)
                     payload = safe_parse_json(tracker, json, GatewayPayload)
                     # If there's any parsing issue then continue loop
                     # TODO perhaps the Discorder user should have an option to throw?
                     isnothing(payload) && continue
-                    @debug "Parsed" payload.op payload.t payload.d payload.s
+                    @debug "Parsed event" payload.op payload.t payload.d payload.s
                     if payload.s isa Integer
                         tracker.seq = payload.s  # sync sequence number
                     end
@@ -399,12 +398,12 @@ function stop_task(tracker::GatewayTracker, task_field::Symbol, reason::String)
             end
             sleep(sleep_time)
             cnt += 1
-            @debug "Ensuring task is stopped" task_field task
+            @debug "Ensuring task is stopped" task_field task reason
         end
-        @error "Unable to stop task" task_field task
+        @error "Unable to stop task" task_field task reason
         return false
     catch ex
-        @error "Unexpected exception while stopping task" ex task_field task
+        @error "Unexpected exception while stopping task" ex task_field task reason
         show_error(ex)
         tracker.fail_on_error && rethrow(ex)
         return false
@@ -444,7 +443,18 @@ function is_operational(tracker::GatewayTracker)
     return true
 end
 
-doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
+is_doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
+
+task_state(task) = isnothing(task) ? nothing : task.state
+
+function status(tracker::GatewayTracker)
+    return (
+        heartbeat=task_state(tracker.heartbeat_task),
+        processor=task_state(tracker.processor_task),
+        doctor=task_state(tracker.doctor_task),
+        master=task_state(tracker.master_task),
+    )
+end
 
 # In general, tasks started with @async should be schedulded immediately.
 # But if it doesn't, then we can wait a little bit before giving up.
@@ -460,8 +470,8 @@ function wait_for_task_to_get_scheduled(task::Task, label::Symbol)
         end
         sleep(0.1)
     end
-    @warn "waiting for task to be scheduled but it never got started" task
-    return nothing
+    @error "waiting for task to be scheduled but it never got started" task
+    return error("Task scheduling error: task=$task label=$label")
 end
 
 function event_object_mappings()

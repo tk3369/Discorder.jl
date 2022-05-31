@@ -17,13 +17,15 @@ Convert object to JSON formatted string.
 """
 json(x::AbstractDiscordObject) = JSON3.write(to_dict(x))
 
-function to_dict(x::T, data=Dict{Symbol,Any}()) where {T<:AbstractDiscordObject}
+function to_dict(x::T) where {T<:AbstractDiscordObject}
+    data = Dict{Symbol,Any}()
     for name in propertynames(x)
         val = getproperty(x, name)
+        # remap keys if necessary
         nn = [n[2] for n in StructTypes.names(T) if n[1] == name]
-        effective_name = length(nn) == 1 ? nn[1] : name
+        key = length(nn) == 1 ? nn[1] : name
         if !ismissing(val)
-            data[effective_name] = val isa AbstractDiscordObject ? toDict(val) : val
+            data[key] = val isa AbstractDiscordObject ? to_dict(val) : val
         end
     end
     return data
