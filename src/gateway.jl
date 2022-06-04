@@ -1,3 +1,13 @@
+@with_kw mutable struct GatewayStats
+    start_time::Optional{ZonedDateTime} = nothing
+    ready_time::Optional{ZonedDateTime} = nothing
+    event_count::Int = 0
+    published_event_count::Int = 0
+    heartbeat_sent_count::Int = 0
+    heartbeat_received_count::Int = 0
+    restart_count::Int = 0
+end
+
 """
     GatewayTracker
 
@@ -48,6 +58,11 @@ GatewayTracker is a stateful object used by the Control Pane.
     Configuration settings. This is typically injected from reading a TOML file.
     """
     config::Dict
+
+    """
+    Some statistics related to the gateway process.
+    """
+    stats::GatewayStats = GatewayStats()
 end
 
 function GatewayTracker(config::Optional{Dict})
@@ -145,7 +160,8 @@ function run_control_plane(;
                 break
             end
             sleep(get_config(config, "throttle_seconds_between_restart"))
-            @info "Going to recover"
+            @info "Going to recover by starting a new control plane"
+            tracker_ref[].restart_count += 1
         end
         @info "Control plane has been shut down completely."
     end
@@ -158,6 +174,7 @@ Start new control plane and return a `GatewayTracker` object.
 """
 function start_control_plane(client::BotClient, config)
     tracker = GatewayTracker(config)
+    tracker.stats.start_time = now(localzone())
     task = @async try
         gateway_url = make_gateway_url(client)
         @info "Connecting to gateway" gateway_url
@@ -196,6 +213,7 @@ function start_control_plane(client::BotClient, config)
             wait_for_task_to_get_scheduled(tracker.doctor_task, :doctor)
 
             @info "Control plane started successfully" tracker
+            tracker.stats.ready_time = now(localzone())
 
             @debug "Waiting for heartbeat and processor tasks"
             @debug "heartbeat_task = $(tracker.heartbeat_task)"
@@ -288,6 +306,7 @@ function start_heartbeat(tracker::GatewayTracker)
             if get_config(tracker.config, "log_heartbeat")
                 @info "Sent heartbeat, taking nap now." nap
             end
+            tracker.stats.heartbeat_sent_count += 1
             sleep(nap)
         end
         @debug "Finished heartbeat task"
@@ -311,6 +330,12 @@ end
 # Processor
 # ---------------------------------------------------------------------------
 
+function publish!(tracker::GatewayTracker, object)
+    put!(tracker.events, object)
+    tracker.stats.published_event_count += 1
+    return nothing
+end
+
 function start_processor(tracker::GatewayTracker)
     tracker.processor_task = @async try
         while true
@@ -322,6 +347,7 @@ function start_processor(tracker::GatewayTracker)
                     # If there's any parsing issue then continue loop
                     # TODO perhaps the Discorder user should have an option to throw?
                     isnothing(payload) && continue
+                    tracker.stats.event_count += 1
                     @debug "Parsed event" payload.op payload.t payload.d payload.s
                     if payload.s isa Integer
                         tracker.seq = payload.s  # sync sequence number
@@ -329,21 +355,23 @@ function start_processor(tracker::GatewayTracker)
                     if payload.op === GatewayOpcode.Resume
                         # https://discord.com/developers/docs/topics/gateway#resumed
                         object = Event("RESUME")
-                        put!(tracker.events, object)
+                        publish!(tracker, object)
                     elseif payload.op === GatewayOpcode.Reconnect
                         # https://discord.com/developers/docs/topics/gateway#reconnect
                         object = Event("RECONNECT")
-                        put!(tracker.events, object)
+                        publish!(tracker, object)
                         stop_control_plane(tracker, "Discord wants me to reconnect")
                     elseif payload.op === GatewayOpcode.InvalidSession
                         # https://discord.com/developers/docs/topics/gateway#invalid-session
                         object = make_object(
                             tracker, "INVALID_SESSION", JSON3.write(payload.d)
                         )
-                        !isnothing(object) && put!(tracker.events, object)
+                        !isnothing(object) && publish!(tracker, object)
+                    elseif payload.op === GatewayOpcode.HeartbeatACK
+                        tracker.stats.heartbeat_received_count += 1
                     elseif !isnothing(payload.t) && !isnothing(payload.d)
                         object = make_object(tracker, payload.t, JSON3.write(payload.d))
-                        !isnothing(object) && put!(tracker.events, object)
+                        !isnothing(object) && publish!(tracker, object)
                     end
                 else
                     @error "Received empty array"
