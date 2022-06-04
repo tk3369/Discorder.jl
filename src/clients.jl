@@ -8,7 +8,7 @@ struct BotClient
     token::Token
     rate_limiter::RateLimiter
 
-    BotClient(token=default_token(); rate_limiter=RateLimiter()) = new(Token(token), rate_limiter)
+    BotClient(token=get_bot_token(); rate_limiter=RateLimiter()) = new(Token(token), rate_limiter)
 end
 
 struct BearerClient

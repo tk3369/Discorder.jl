@@ -1,4 +1,15 @@
 """
+    get_bot_token()
+
+Get the bot token from enviornment variable `DISCORD_BOT_TOKEN`.
+"""
+function get_bot_token()
+    token = get(ENV, "DISCORD_BOT_TOKEN", "")
+    isempty(token) && error("Please define DISCORD_BOT_TOKEN environemnt variable.")
+    return token
+end
+
+"""
     waterfall(f, xs)
 
 Apply function `f` to each element of collection `xs` iteratively and return

@@ -114,13 +114,13 @@ end
 # 2. Processor: receive and dispatch messages from Discord gateway
 # 3. Doctor: monitor the health of the control plane and stop it when it's unhealthy
 #
-# The `run_control_plane` function starts a new control plane and wait for it to
+# The `run` function starts a new control plane and wait for it to
 # finish in a loop. Hence, if the doctor has diagnosed problems and stopped it,
 # then a new control plane would come to live again.
 # ---------------------------------------------------------------------------
 
 """
-    run_control_plane(;
+    run(;
         client::BotClient=BotClient(),
         tracker_ref=Ref{GatewayTracker}(),
         config_file_path::Optional{AbstractString}=nothing,
@@ -129,7 +129,7 @@ end
 Run control plane in a loop so that we can actually auto-recover when
 bad things happen.
 """
-function run_control_plane(;
+function run(;
     client::BotClient=BotClient(),
     tracker_ref=Ref{GatewayTracker}(),
     config_file_path::Optional{AbstractString}=nothing,
@@ -198,7 +198,7 @@ function start_control_plane(client::BotClient, config)
             tracker.heartbeat_interval_ms = payload.d["heartbeat_interval"]
 
             # https://discord.com/developers/docs/topics/gateway#identifying
-            send_identify(tracker)
+            send_identify_payload(tracker)
 
             @debug "Starting heartbeat and processor tasks"
             start_heartbeat(tracker)
@@ -215,9 +215,7 @@ function start_control_plane(client::BotClient, config)
             @info "Control plane started successfully" tracker
             tracker.stats.ready_time = now(localzone())
 
-            @debug "Waiting for heartbeat and processor tasks"
-            @debug "heartbeat_task = $(tracker.heartbeat_task)"
-            @debug "processor_task = $(tracker.processor_task)"
+            @debug "Waiting for tasks" tracker.heartbeat_task tracker.processor_task
             safe_wait(tracker, tracker.heartbeat_task, :heartbeat)
             safe_wait(tracker, tracker.processor_task, :processor)
 
@@ -232,19 +230,13 @@ function start_control_plane(client::BotClient, config)
     return tracker
 end
 
-function default_token()
-    token = get(ENV, "DISCORD_BOT_TOKEN", "")
-    isempty(token) && error("Please define DISCORD_BOT_TOKEN environemnt variable.")
-    return token
-end
-
 # https://discord.com/developers/docs/topics/gateway#identifying
-function send_identify(tracker::GatewayTracker)
+function send_identify_payload(tracker::GatewayTracker)
     @info "Sending IDENTIFY payload"
     payload = GatewayPayload(;
         op=GatewayOpcode.Identify,
         d=Identify(;
-            token=default_token(),
+            token=get_bot_token(),
             intents=Int(0x01ffff),
             properties=IdentifyConnectionProperties(;
                 os_="linux", browser_="Discorder", device_="Discorder"
@@ -330,7 +322,7 @@ end
 # Processor
 # ---------------------------------------------------------------------------
 
-function publish!(tracker::GatewayTracker, object)
+function publish_event(tracker::GatewayTracker, object)
     put!(tracker.events, object)
     tracker.stats.published_event_count += 1
     return nothing
@@ -354,24 +346,24 @@ function start_processor(tracker::GatewayTracker)
                     end
                     if payload.op === GatewayOpcode.Resume
                         # https://discord.com/developers/docs/topics/gateway#resumed
-                        object = Event("RESUME")
-                        publish!(tracker, object)
+                        event = Event("RESUME")
+                        publish_event(tracker, event)
                     elseif payload.op === GatewayOpcode.Reconnect
                         # https://discord.com/developers/docs/topics/gateway#reconnect
-                        object = Event("RECONNECT")
-                        publish!(tracker, object)
+                        event = Event("RECONNECT")
+                        publish_event(tracker, event)
                         stop_control_plane(tracker, "Discord wants me to reconnect")
                     elseif payload.op === GatewayOpcode.InvalidSession
                         # https://discord.com/developers/docs/topics/gateway#invalid-session
-                        object = make_object(
+                        event = create_event(
                             tracker, "INVALID_SESSION", JSON3.write(payload.d)
                         )
-                        !isnothing(object) && publish!(tracker, object)
+                        !isnothing(event) && publish_event(tracker, event)
                     elseif payload.op === GatewayOpcode.HeartbeatACK
                         tracker.stats.heartbeat_received_count += 1
                     elseif !isnothing(payload.t) && !isnothing(payload.d)
-                        object = make_object(tracker, payload.t, JSON3.write(payload.d))
-                        !isnothing(object) && publish!(tracker, object)
+                        event = create_event(tracker, payload.t, JSON3.write(payload.d))
+                        !isnothing(event) && publish_event(tracker, event)
                     end
                 else
                     @error "Received empty array"
@@ -475,7 +467,7 @@ is_doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task
 
 task_state(task) = isnothing(task) ? nothing : task.state
 
-function status(tracker::GatewayTracker)
+function get_status(tracker::GatewayTracker)
     return (
         heartbeat=task_state(tracker.heartbeat_task),
         processor=task_state(tracker.processor_task),
@@ -502,7 +494,7 @@ function wait_for_task_to_get_scheduled(task::Task, label::Symbol)
     return error("Task scheduling error: task=$task label=$label")
 end
 
-function event_object_mappings()
+function get_event_object_mappings()
     return Dict(
         # https://discord.com/developers/docs/topics/gateway#ready
         "READY" => ReadyEvent,
@@ -584,10 +576,10 @@ function event_object_mappings()
     )
 end
 
-function parse_event(
+function parse_gateway_event_json(
     tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString}
 )
-    mappings = event_object_mappings()
+    mappings = get_event_object_mappings()
     T = haskey(mappings, event_type) ? mappings[event_type] : Any
     object = safe_parse_json(tracker, json, T)
     isnothing(object) && @error "Skipping event due to parsing issue" event_type json
@@ -595,14 +587,14 @@ function parse_event(
 end
 
 """
-    make_object(tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString})
+    create_event_object(tracker::GatewayTracker, event_type::AbstractString, json::Optional{Abstract)
 
-Create an event object.
+Create an event object by parsing the gateway event as JSON string.
 """
-function make_object(
+function create_event(
     tracker::GatewayTracker, event_type::AbstractString, json::Optional{AbstractString}
 )
-    object = parse_event(tracker, event_type, json)
+    object = parse_gateway_event_json(tracker, event_type, json)
     return Event(event_type, object)
 end
 
