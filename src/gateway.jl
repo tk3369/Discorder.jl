@@ -63,6 +63,11 @@ GatewayTracker is a stateful object used by the Control Pane.
     Some statistics related to the gateway process.
     """
     stats::GatewayStats = GatewayStats()
+
+    """
+    How to publish messages
+    """
+    publishers::Vector{AbstractEventPublisher} = AbstractEventPublisher[]
 end
 
 function GatewayTracker(config::Optional{Dict})
@@ -144,7 +149,9 @@ function run(;
     with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
-            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
+            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(
+                client, config
+            )
             @info "Started control plane" elapsed_seconds
             try
                 wait(tracker_ref[].master_task)
@@ -322,8 +329,11 @@ end
 # Processor
 # ---------------------------------------------------------------------------
 
-function publish_event(tracker::GatewayTracker, object)
-    put!(tracker.events, object)
+function publish_event(tracker::GatewayTracker, event::Event)
+    put!(tracker.events, event)
+    for p in tracker.publishers
+        publish(p, event)
+    end
     tracker.stats.published_event_count += 1
     return nothing
 end
@@ -512,7 +522,7 @@ function get_event_object_mappings()
         "CHANNEL_UPDATE" => DiscordChannel,
         "CHANNEL_DELETE" => DiscordChannel,
         "CHANNEL_PINS_UPDATE" => ChannelPinsUpdateEvent,
-        "THREAD_CREATE" => Channel,
+        "THREAD_CREATE" => DiscordChannel,
         "THREAD_UPDATE" => DiscordChannel,
         "THREAD_DELETE" => DiscordChannel,
         "THREAD_LIST_SYNC" => ThreadListSyncEvent,
@@ -598,6 +608,20 @@ function create_event(
     return Event(event_type, object)
 end
 
+function add_event_publisher(tracker::GatewayTracker, publisher::AbstractEventPublisher)
+    if publisher in tracker.publishers
+        @error "Cannot add duplicate event publisher" publisher
+        return nothing
+    end
+    push!(tracker.publishers, publisher)
+    return nothing
+end
+
+function clear_event_publishers(tracker::GatewayTracker)
+    @info "Clearing all event publishers"
+    empty!(tracker.publishers)
+end
+
 """
     safe_parse_json(tracker::GatewayTracker, json::AbstractString, T::DataType)
 
@@ -631,7 +655,7 @@ function safe_wait(tracker::GatewayTracker, task, label)
         catch ex
             @error "Unable to wait for task" task ex label
             show_error(ex)
-            fail_on_error && rethrow(ex)
+            tracker.fail_on_error && rethrow(ex)
         end
     end
     return nothing

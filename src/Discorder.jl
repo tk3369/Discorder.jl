@@ -4,7 +4,8 @@ export BotClient, BearerClient
 
 using Base.Iterators: Pairs
 
-using Dates: DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
+using Dates:
+    DateTime, ISODateTimeFormat, Millisecond, UTC, now, unix2datetime, year, format, Second
 using Logging: Logging, with_logger
 using TOML: TOML
 
@@ -14,7 +15,7 @@ using JSON3: JSON3, StructTypes
 using LoggingExtras: TransformerLogger, FileLogger, MinLevelLogger
 using Parameters: @with_kw
 using TimeZones: localzone, ZonedDateTime
-
+using ZMQ: ZMQ
 
 const API_BASE = "https://discord.com/api"
 const API_VERSION = 9
@@ -40,7 +41,7 @@ include("rate_limiter.jl")
 include("clients.jl")
 include("routes.jl")
 include("constants.jl")
-include("event.jl")
 include("gateway.jl")
+include("zmq.jl")
 
 end

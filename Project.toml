@@ -14,6 +14,7 @@ LoggingExtras = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
+ZMQ = "c2297ded-f4af-51ae-bb23-16f91089e4e1"
 
 [compat]
 EnumX = "1"

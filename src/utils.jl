@@ -36,8 +36,10 @@ Display an error in the log with backtrace. This is usefulf for
 debugging purpose.
 """
 function show_error(ex::Exception)
-    bt = Base.catch_backtrace()
-    return Base.showerror(stderr, ex)
+    for (i, frame) in enumerate(stacktrace(catch_backtrace()))
+        @error "Backtrace $i: $(frame.func) at $(frame.file):$(frame.line)"
+    end
+    return nothing
 end
 
 """
