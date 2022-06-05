@@ -43,11 +43,6 @@ GatewayTracker is a stateful object used by the Control Pane.
     terminate_flag::Bool = false
 
     """
-    The `events` channel is used for communicating gateway events to end users.
-    """
-    events::Channel{Event}
-
-    """
     Throw exception and exit control pane when any exception is encountered.
     This is useful for during development. When this is set to false, exceptions
     are generally swallowed but reported so they appear in the log file.
@@ -72,9 +67,7 @@ end
 
 function GatewayTracker(config::Optional{Dict})
     fail_on_error = get_config(config, "fail_on_error")
-    event_queue_size = get_config(config, "event_queue_size")
-    events = Channel{Event}(event_queue_size)
-    return GatewayTracker(; fail_on_error, events, config)
+    return GatewayTracker(; fail_on_error, config)
 end
 
 function get_config(config::Optional{Dict}, key::AbstractString)
@@ -149,9 +142,7 @@ function run(;
     with_logger(get_logger(; debug)) do
         while true
             @info "Starting a new control plane"
-            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(
-                client, config
-            )
+            elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
             @info "Started control plane" elapsed_seconds
             try
                 wait(tracker_ref[].master_task)
@@ -330,7 +321,6 @@ end
 # ---------------------------------------------------------------------------
 
 function publish_event(tracker::GatewayTracker, event::Event)
-    put!(tracker.events, event)
     for p in tracker.publishers
         publish(p, event)
     end
@@ -619,7 +609,7 @@ end
 
 function clear_event_publishers(tracker::GatewayTracker)
     @info "Clearing all event publishers"
-    empty!(tracker.publishers)
+    return empty!(tracker.publishers)
 end
 
 """
