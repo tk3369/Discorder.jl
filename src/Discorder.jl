@@ -18,7 +18,7 @@ using TimeZones: localzone, ZonedDateTime
 using ZMQ: ZMQ
 
 const API_BASE = "https://discord.com/api"
-const API_VERSION = 9
+const API_VERSION = 10
 
 # See format at https://discord.com/developers/docs/reference#user-agent
 const USER_AGENT = let
