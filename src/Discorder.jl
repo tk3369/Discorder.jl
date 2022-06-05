@@ -42,6 +42,8 @@ include("clients.jl")
 include("routes.jl")
 include("constants.jl")
 include("gateway.jl")
-include("zmq.jl")
+include("publishers/channel.jl")
+include("publishers/delimited.jl")
+include("publishers/zmq.jl")
 
 end

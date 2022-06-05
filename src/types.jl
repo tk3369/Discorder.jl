@@ -13,7 +13,9 @@ struct Event{S<:AbstractString,T}
     data::T
     timestamp::ZonedDateTime
 end
+
 Event(type::AbstractString, data::T=nothing) where {T} = Event(type, data, now(localzone()))
+
 Base.show(io::IO, e::Event) = print(io, string(e.timestamp), " ", e.type)
 
 function Base.string(event::Event)
@@ -29,6 +31,18 @@ function Base.parse(::Type{Event}, s::AbstractString)
     return Event(type, data, parse_zoned_date_time(timestamp))
 end
 
-# Publisher interface
+"""
+    AbstractEventPublisher
+
+An interface for publishing gateway events.
+"""
 abstract type AbstractEventPublisher end
+
+"""
+    publish(publisher::AbstractEventPublisher, event::Event)
+
+Publish an event via the provided event publisher.
+
+See also: [ChannelEventPublisher](@ref), [ZMQEventPublisher](@ref)
+"""
 function publish(publisher::AbstractEventPublisher, event::Event) end
