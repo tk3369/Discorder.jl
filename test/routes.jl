@@ -1,6 +1,6 @@
 const UP = "👍"
 const DOWN = "👎"
-const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
+const client = D.BotClient()
 
 @testset "A bunch of HTTP interactions" begin
     playback("responses.bson") do
@@ -27,15 +27,18 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             # Reordering channels (a good test for ArrayBody).
             text_general = channels[3]
             channel = D.create_guild_channel(client, guild; name="test")
-            D.update_guild_channel_positions(client, guild; positions=[
-                (; id=text_general.id, position=5),
-                (; id=channel.id, position=3),
-            ])
+            D.modify_guild_channel_positions(
+                client,
+                guild;
+                positions=[
+                    (; id=text_general.id, position=5), (; id=channel.id, position=3)
+                ],
+            )
             @test D.get_channel(client, text_general.id).position == 5
             @test D.get_channel(client, channel.id).position == 3
 
             # Update + delete channel.
-            channel = D.update_channel(client, channel; name="test2")
+            channel = D.modify_channel(client, channel; name="test2")
             @test channel.name == "test2"
             D.delete_channel(client, channel)
             @test length(D.get_guild_channels(client, guild)) == 4
@@ -54,7 +57,7 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             users = D.get_reactions(client, channel, message, UP)
             @test length(users) == 1 && users[1].id == user.id
             @test length(D.get_reactions(client, channel, message, UP)) == 1
-            D.delete_reaction(client, channel, message, UP)
+            D.delete_own_reaction(client, channel, message, UP)
             @test isempty(D.get_reactions(client, channel, message, UP))
 
             # Delete all reactions
@@ -64,14 +67,14 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test isempty(D.get_reactions(client, channel, message, DOWN))
 
             # Updating + deleting messages.
-            @test D.update_message(client, channel, message; content="a").content == "a"
+            @test D.edit_message(client, channel, message; content="a").content == "a"
             D.delete_message(client, channel, message)
             @test isempty(D.get_channel_messages(client, channel))
 
             # Create and delete multiple messages
             ids = map(i -> D.create_message(client, channel; content="hi").id, 1:5)
             @test length(D.get_channel_messages(client, channel)) == 5
-            D.delete_messages(client, channel; messages=ids)
+            D.bulk_delete_messages(client, channel; messages=ids)
             sleep(1) # give it a little time to really delete the messages
             @test isempty(D.get_channel_messages(client, channel))
 
@@ -89,36 +92,36 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test isempty(D.get_guild_invites(client, guild))
 
             # Pins + typing.
-            D.create_typing_indicator(client, channel)
+            D.trigger_typing_indicator(client, channel)
             @test isempty(D.get_pinned_messages(client, channel))
             message = D.create_message(client, channel; content="pin")
-            D.create_pinned_channel_message(client, channel, message)
+            D.pin_message(client, channel, message)
             pins = D.get_pinned_messages(client, channel)
             @test length(pins) == 1 && pins[1].id == message.id
-            D.delete_pinned_channel_message(client, channel, message)
+            D.unpin_message(client, channel, message)
             @test isempty(D.get_pinned_messages(client, channel))
             D.delete_message(client, channel, message)
 
             # Emojis.
-            @test isempty(D.get_guild_emojis(client, guild))
+            @test isempty(D.list_guild_emojis(client, guild))
             # TODO: Figure out how to properly send the payload.
-            image_data = read(joinpath(@__DIR__, "emoji.png")) |> base64encode
+            image_data = base64encode(read(joinpath(@__DIR__, "emoji.png")))
             image_encoded = "data:image/jpeg;base64,$image_data"
             emoji = D.create_guild_emoji(client, guild; name="test", image=image_encoded)
-            emojis = D.get_guild_emojis(client, guild)
+            emojis = D.list_guild_emojis(client, guild)
             @test length(emojis) == 1 && emojis[1].id == emoji.id
-            # @test D.update_guild_emoji(client, guild, emoji; name="test2").name == "test2"
+            # @test D.modify_guild_emoji(client, guild, emoji; name="test2").name == "test2"
             # @test D.get_guild_emoji(client, guild, emoji).name == "test2"
             D.delete_guild_emoji(client, guild, emoji)
-            @test isempty(D.get_guild_emojis(client, guild))
+            @test isempty(D.list_guild_emojis(client, guild))
 
             # Guilds/members.
             @test D.get_guild(client, guild).id == guild.id
-            @test D.update_guild(client, guild; name="test2").name == "test2"
+            @test D.modify_guild(client, guild; name="test2").name == "test2"
             @test D.get_guild_member(client, guild, user).user.id == user.id
-            members = D.get_guild_members(client, guild)
+            members = D.list_guild_members(client, guild)
             @test length(members) == 1 && members[1].user.id == user.id
-            @test D.modify_user_nick(client, guild; nick="test3").nick == "test3"
+            @test D.modify_current_user_nick(client, guild; nick="test3").nick == "test3"
             @test D.get_guild_member(client, guild, user).nick == "test3"
 
             # Roles.
@@ -128,11 +131,11 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
             @test role.name == "test"
             roles = D.get_guild_roles(client, guild)
             @test length(roles) == 2 && roles[2].id == role.id
-            @test D.update_guild_role(client, guild, role; name="test2").name == "test2"
-            D.create_guild_member_role(client, guild, user, role)
+            @test D.modify_guild_role(client, guild, role; name="test2").name == "test2"
+            D.add_guild_member_role(client, guild, user, role)
             role_ids = D.get_guild_member(client, guild, user).roles
             @test length(role_ids) == 1 && role_ids[1] == role.id
-            D.delete_guild_member_role(client, guild, user, role)
+            D.remove_guild_member_role(client, guild, user, role)
             @test isempty(D.get_guild_member(client, guild, user).roles)
             D.delete_guild_role(client, guild, role)
             roles = D.get_guild_roles(client, guild)
@@ -161,7 +164,7 @@ const client = D.BotClient(get(ENV, "DISCORD_TOKEN", ""))
 
             # Misc.
             @test eltype(D.get_guild_voice_regions(client, guild)) === D.VoiceRegion
-            @test eltype(D.get_voice_regions(client)) === D.VoiceRegion
+            @test eltype(D.list_voice_regions(client)) === D.VoiceRegion
             @test isempty(D.get_guild_bans(client, guild))
             @test D.get_guild_prune_count(client, guild).pruned == 0
         finally
