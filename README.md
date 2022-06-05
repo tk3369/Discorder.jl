@@ -6,8 +6,13 @@ Write [Discord](https://discord.com) bots in [Julia](https://julialang.org).
 
 ### Status
 
-This package is in the early stages.
-Currently, the full REST API is available, but the gateway interface has not been implemented.
+This package is still in an early stage.
+
+Here is the list of features:
+- [x] Discord v10 API support
+- [x] Gateway interface with several event publishers
+- [x] Control plane that auto-recover from connectivity failures
+-
 
 ### History
 
