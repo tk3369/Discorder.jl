@@ -1,6 +1,7 @@
 # Discorder
 
 [![HoJ Discord](https://img.shields.io/discord/762167454973296644?color=8af&label=HoJ%20Discord&style=flat-square)](https://discord.gg/mm2kYjB)
+https://img.shields.io/badge/status-work%20in%20progress-yellow
 
 Write [Discord](https://discord.com) bots in [Julia](https://julialang.org).
 
