@@ -6,7 +6,7 @@ const client = D.BotClient()
     playback("responses.bson") do
         # Create a guild to play around in.
         guild = D.create_guild(client; name="MyGuild")
-        user = D.get_user(client)
+        user = D.get_current_user(client)
         try
             # Check that we can use either the object or the ID.
             @test D.get_guild(client, guild.id).id == guild.id
@@ -151,7 +151,7 @@ const client = D.BotClient()
             @test length(webhooks) == 1 && webhooks[1].id == webhook.id
             webhooks = D.get_guild_webhooks(client, guild)
             @test length(webhooks) == 1 && webhooks[1].id == webhook.id
-            @test D.update_webhook(client, webhook; name="test2").name == "test2"
+        @test D.modify_webhook(client, webhook; name="test2").name == "test2"
             message = D.execute_webhook(client, webhook, webhook.token; content="hi")
             @test message.content == "hi"
             D.delete_webhook(client, webhook)

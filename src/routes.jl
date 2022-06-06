@@ -201,7 +201,7 @@ RESOURCE[] = "channel"
 @route get_channel_messages GET "/channels/$channel_id/messages" Vector{Message} kwargs
 @route get_channel_message GET "/channels/$channel_id/messages/$message_id" Message
 @route create_message POST "/channels/$channel_id/messages" Message kwargs
-@route crosspost_message POST "/channels/$channel_id/messages/{message.id}/crosspost" Message
+@route crosspost_message POST "/channels/$channel_id/messages/$message_id/crosspost" Message
 @route create_reaction PUT "/channels/$channel_id/messages/$message_id/reactions/$emoji/@me"
 @route delete_own_reaction DELETE "/channels/$channel_id/messages/$message_id/reactions/$emoji/@me"
 @route delete_user_reaction DELETE "/channels/$channel_id/messages/$message_id/reactions/$emoji/$user_id"
@@ -289,15 +289,36 @@ RESOURCE[] = "guild"
 @route modify_current_user_voice_state PATCH "/guilds/$guild_id/voice-states/@me" kwargs
 @route modify_user_voice_state PATCH "/guilds/$guild_id/voice-states/$user_id" kwargs
 
-# TODO Guild scheduled event
+RESOURCE[] = "guild-scheduled-event"
+@route list_guild_scheduled_events GET "/guilds/$guild_id/scheduled-events" Vector{
+    GuildScheduledEvent
+} kwargs
+@route create_guild_scheduled_event POST "/guilds/$guild_id/scheduled-events" GuildScheduledEvent kwargs
+@route get_guild_scheduled_event GET "/guilds/$guild_id/scheduled-events/$guild_scheduled_event_id" GuildScheduledEvent kwargs
+@route modify_guild_scheduled_event PATCH "/guilds/$guild_id/scheduled-events/$guild_scheduled_event_id" GuildScheduledEvent kwargs
+@route delete_guild_scheduled_event DELETE "/guilds/$guild_id/scheduled-events/$guild_scheduled_event_id"
+@route get_guild_scheduled_event_users GET "/guilds/$guild_id/scheduled-events/$guild_scheduled_event_id/users" Vector{
+    GuildScheduledEventUser
+} kwargs
 
-# TODO Guild template
+RESOURCE[] = "guild-template"
+@route get_guild_template GET "/guilds/templates/$template_code" GuildTemplate
+@route create_guild_from_guild_template POST "/guilds/templates/$template_code" Guild kwargs
+@route get_guild_templates GET "/guilds/$guild_id/templates" Vector{GuildTemplate}
+@route create_guild_template POST "/guilds/$guild_id/templates" GuildTemplate kwargs
+@route sync_guild_template PUT "/guilds/$guild_id/templates/$template_code" GuildTemplate
+@route modify_guild_template PATCH "/guilds/$guild_id/templates/$template_code" GuildTemplate kwargs
+@route delete_guild_template DELETE "/guilds/$guild_id/templates/$template_code" GuildTemplate
 
 RESOURCE[] = "invite"
 @route get_invite GET "/invites/$invite_code" Invite kwargs
 @route delete_invite DELETE "/invites/$invite_code" Invite
 
-# TODO Stage Instance
+RESOURCE[] = "stage-instance"
+@route create_stage_instance POST "/stage-instances" StageInstance kwargs
+@route get_stage_instance GET "/stage-instances/{channel.id}" StageInstance
+@route modify_stage_instance PATCH "/stage-instances/{channel.id}" StageInstance kwargs
+@route delete_stage_instance DELETE "/stage-instances/{channel.id}"
 
 RESOURCE[] = "sticker"
 @route get_sticker GET "/stickers/$sticker_id" Sticker
@@ -308,13 +329,13 @@ RESOURCE[] = "sticker"
 @route modify_guild_sticker PATCH "/guilds/$guild_id/stickers/$sticker_id" Sticker kwargs
 @route delete_guild_sticker DELETE "/guilds/$guild_id/stickers/$sticker_id"
 
-# TODO sync v10
 RESOURCE[] = "user"
-@route get_user GET "/users/$(user_id="@me")" User
-@route update_user PATCH "/users/@me" User kwargs
-@route get_user_guilds GET "/users/@me/guilds" Vector{Guild} kwargs
+@route get_current_user GET "/users/@me" User
+@route get_user GET "/users/$user_id" User
+@route modify_current_user PATCH "/users/@me" User kwargs
+@route get_current_user_guilds GET "/users/@me/guilds" Vector{Guild} kwargs
+@route get_current_user_guild_member GET "/users/@me/guilds/{guild.id}/member" GuildMember
 @route leave_guild DELETE "/users/@me/guilds/$guild_id"
-@route get_user_dms GET "/users/@me/channels" Vector{DiscordChannel}
 @route create_dm POST "/users/@me/channels" DiscordChannel kwargs
 @route create_group_dm POST "/users/@me/channels" DiscordChannel kwargs
 @route get_user_connections GET "/users/@me/connections" Vector{Connection}
@@ -322,21 +343,29 @@ RESOURCE[] = "user"
 RESOURCE[] = "voice"
 @route list_voice_regions GET "/voice/regions" Vector{VoiceRegion}
 
-# TODO sync v10
 RESOURCE[] = "webhook"
 @route create_webhook POST "/channels/$channel_id/webhooks" Webhook kwargs
 @route get_channel_webhooks GET "/channels/$channel_id/webhooks" Vector{Webhook}
 @route get_guild_webhooks GET "/guilds/$guild_id/webhooks" Vector{Webhook}
-@route get_webhook GET "/webhooks/$webhook_id/$(token=nothing)" Webhook
-@route update_webhook PATCH "/webhooks/$webhook_id/$(token=nothing)" Webhook kwargs
-@route delete_webhook DELETE "/webhooks/$webhook_id/$(token=nothing)" Webhook kwargs
-@route execute_webhook POST "/webhooks/$webhook_id/$token" Message query = (wait=true,) kwargs
-@route execute_webhook_github POST "/webhooks/$webhook_id/$token/github" Message query = (
+@route get_webhook GET "/webhooks/$webhook_id" Webhook
+@route get_webhook_with_token GET "/webhooks/$webhook_id/$webhook_token" Webhook
+@route modify_webhook PATCH "/webhooks/$webhook_id" Webhook kwargs
+@route modify_webhook_with_token PATCH "/webhooks/$webhook_id/$webhook_token" Webhook kwargs
+@route delete_webhook DELETE "/webhooks/$webhook_id" Webhook kwargs
+@route delete_webhook_with_token DELETE "/webhooks/$webhook_id/$webhook_token" Webhook kwargs
+@route execute_webhook POST "/webhooks/$webhook_id/$webhook_token" Message query = (
     wait=true,
 ) kwargs
-@route execute_webhook_slack POST "/webhooks/$webhook_id/$token/slack" Message query = (
+@route execute_github_compatible_webhook POST "/webhooks/$webhook_id/$webhook_token/github" Message query = (
     wait=true,
 ) kwargs
+@route execute_slack_compatible_webhook POST "/webhooks/$webhook_id/$webhook_token/slack" Message query = (
+    wait=true,
+) kwargs
+@route get_webhook_message GET "/webhooks/$webhook_id/$webhook_tokenb/messages/$message_id" Message kwargs
+@route edit_webhook_message PATCH "/webhooks/$webhook_id/$webhook_tokenb/messages/$message_id" Message kwargs
+@route delete_webhook_message DELETE "/webhooks/$webhook_id/$webhook_tokenb/messages/$message_id" kwargs
 
 RESOURCE[] = "gateway"
 @route get_gateway GET "/gateway" Gateway
+

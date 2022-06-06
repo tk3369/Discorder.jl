@@ -1,4 +1,4 @@
-# https://discord.com/developers/docs/topics/gateway#guild-scheduled-event-user-Add
+# https://discord.com/developers/docs/topics/gateway#guild-scheduled-event-user-add
 @discord_object struct GuildScheduledEventUserAddEvent
     guild_scheduled_event_id::Snowflake
     user_id::Snowflake
