@@ -4,15 +4,16 @@
 
 Write [Discord](https://discord.com) bots in [Julia](https://julialang.org).
 
-### Status
-
-This package is still in an early stage.
+### Current status
 
 Here is the list of features:
-- [x] Discord v10 API support
-- [x] Gateway interface with several event publishers
-- [x] Control plane that auto-recover from connectivity failures
--
+- [x] Discord v10 API support (reconciled in June 2022)
+- [x] Gateway connectivity and auto-recovery from connection problems
+- [x] System management via control plane
+- [x] Event publisher (local channel, file-based, and ZMQ pub/sub)
+- [ ] High level command/handler API like those in Xh4H Discord.jl
+- [ ] Comprehensive tests for all APIs and gateway events
+- [ ] Gateway resume (it currently opens a new connection during recovery)
 
 ### History
 
