@@ -15,6 +15,7 @@ Here is the list of features:
 - [ ] High level command/handler API like those in Xh4H Discord.jl
 - [ ] Comprehensive tests for all APIs and gateway events
 - [ ] Gateway resume (it currently opens a new connection during recovery)
+- [ ] Audit log header (required for certain API calls since v10)
 
 ### History
 
