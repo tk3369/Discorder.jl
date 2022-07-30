@@ -114,7 +114,7 @@ bot = Bot(BotClient(), ZMQConnector(6000))
 
 # Add handlers
 prefix = ","
-add_handler!(bot, juliadoc_handler, CommandTrigger(prefix, "echo"))
+add_handler!(bot, echo_handler, CommandTrigger(prefix, "echo"))
 
 # Infinite loop
 run_loop(bot)
@@ -122,7 +122,7 @@ run_loop(bot)
 
 And the handler:
 ```julia
-function juliadoc_handler(
+function echo_handler(
     # Allow the handler to interact with Discord e.g. sending a message
     client::BotClient,
 
