@@ -4,6 +4,7 @@ Working with gateway directly is powerful but it would be nicer if there's a com
 
 Let's use HoJ bot as example:
 
+```
 ,tz yyyy-mm-dd hh:mm:ss
 ,ig view
 ,ig perf
@@ -12,6 +13,7 @@ Let's use HoJ bot as example:
 ,ig sell 200 ibm
 ,discourse latest
 ,discourse traits
+```
 
 Most of these are handled by matching some regex. So maybe we can take the command name & regex captures as a "command config". Prefix should be auto handled as well.
 
