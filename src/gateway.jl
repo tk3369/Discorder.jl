@@ -74,7 +74,6 @@ function get_config(config::Optional{Dict}, key::AbstractString)
     # default config mimics production settings
     default_config = Dict(
         "fail_on_error" => false,
-        "event_queue_size" => 1024,
         "debug" => false,
         "log_heartbeat" => false,
         "throttle_seconds_between_restart" => 1,
