@@ -5,7 +5,6 @@
     published_event_count::Int = 0
     heartbeat_sent_count::Int = 0
     heartbeat_received_count::Int = 0
-    restart_count::Int = 0
 end
 
 """
@@ -158,7 +157,6 @@ function run(;
             end
             sleep(get_config(config, "throttle_seconds_between_restart"))
             @info "Going to recover by starting a new control plane"
-            tracker_ref[].restart_count += 1
         end
         @info "Control plane has been shut down completely."
     end
