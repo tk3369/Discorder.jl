@@ -114,7 +114,12 @@ Now, go to Discord and enter a text message. I just entered "hello". The ZMQ sub
 └   msg = "MESSAGE_CREATE\t2022-09-11T16:17:41.535-07:00\t{\"member\":{\"avatar\":null,\"nick\":null,\"communication_disabled_until\":null,\"premium_since\":null,\"joined_at\":\"2022-02-10T07:40:03.886+00:00\",\"roles\":[\"980718892966088764\"],\"deaf\":false,\"pending\":false,\"mute\":false},\"nonce\":\"1018661642344333312\",\"timestamp\":\"2022-09-11T23:17:41.507+00:00\",\"embeds\":[],\"channel_id\":\"941237066015068163\",\"mention_everyone\":false,\"edited_timestamp\":null,\"author\":{\"avatar\":\"e99d41549a0f64ff8e7f02fa146d27b8\",\"id\":\"549374980488560651\",\"discriminator\":\"8593\",\"public_flags\":0,\"username\":\"tk3369\"},\"guild_id\":\"941237066015068160\",\"tts\":false,\"mentions\":[],\"pinned\":false,\"id\":\"1018661642990526504\",\"type\":0,\"content\":\"hello\",\"mention_roles\":[],\"attachments\":[]}"
 ```
 
-The other publishers are:
+The wire format contains a tab-delimited string with three components:
+1. Event type e.g. `MESSAGE_CREATE`
+2. Timestamp e.g. `2022-09-11T16:17:41.535-07:00`
+3. JSON payload
+
+The other publishers implementations are as follows:
 * `ChannelEventPublisher`: publish events to a `Channel`
 * `DelimitedFileEventPublisher`: publish events to a delimited file
 
