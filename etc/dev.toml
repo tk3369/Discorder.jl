@@ -1,4 +1,4 @@
 [gateway]
-fail_on_error = true
+fail_on_error = false
 debug = true
 log_heartbeat = true
