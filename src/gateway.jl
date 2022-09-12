@@ -155,6 +155,7 @@ function run(;
                 @info "Fail on error flag is set to true, exiting control pane loop."
                 break
             end
+            @info "Sleeping betwwen restarts"
             sleep(get_config(config, "throttle_seconds_between_restart"))
             @info "Going to recover by starting a new control plane"
         end
