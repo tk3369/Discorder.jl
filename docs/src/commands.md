@@ -51,97 +51,35 @@ Learning from existing packages, Xh4H's Discord.jl has two kinds of integration:
 - Command: invoke user code when someone types a message
 - Handler: invokes user code some some kind of event happened e.g. reactions
 
-But, do we really need to separate them? Do we get a simpler interface otherwise?
-E.g.
+Below is the current design.
+
+First, create an instance of a bot. This object is used to keep track of the bot client as well as registered handlers. By default, the bot listens to port 6000 for ZMQ events. See [control plane doc](control_plane.md) about how to publish events from the Gateway using ZMQ.
 
 ```julia
-function configure_handler(
-    id::Symbol, # a unique identifier for this handler
-    f::Function, # function to be called
-    trigger::AbstractTrigger, # when the function should be invoked
-)::Handler
+bot = SimpleBot()
 ```
 
-Then, the event loop is quite simple:
-```julia
-while true
-    ev = get_next_event()
-    active_handlers = filter(h -> should_trigger(h.trigger, ev), handlers)
-    foreach(invoke_handler, active_handlers)
-end
-```
-
-A trigger may be implemented with the following interface. It determines where the trigger is active for a specific gateway event.
+Registering a command handler involves a command prefix and a regex to recognize the command itself. There are always two arguments passed to the user function: 1) bot client 2) discord object for that event.
 
 ```julia
-should_invoke(t::AbstractTrigger, ev::Event)::Bool
+julia> register!(bot, CommandTrigger(',', r"echo ")) do client, message
+           msg = strip(message.content[6:end])
+           @info "message content = $msg"
+           create_message(client, message.channel_id; content = "$msg")
+       end
 ```
 
-What kinds of triggers are available? There could be prebuilt ones such as one that matches commands:
+For illustration purpose, here's how to register a reaction handler, which would be called whenever a reaction add event is triggered.
 
 ```julia
-struct CommandTrigger <: AbstractTrigger
-    prefix::Char
-    regex::Regex  # matches starting 2nd character
-end
-
-# sample implementation
-function should_invoke(t::CommandTrigger, ev::Event)
-    if ev.type == "MESSAGE_CREATE"
-        message = ev.data.content
-        first(message) == t.prefix || return false
-        rest = s[nextind(s, 1):end]
-        return !isnothing(match(t.regex, rest))
-    end
-    return false
-end
+julia> register!(bot, ReactionAddTrigger()) do client, reaction_add_event
+           @info "reaction event " reaction_add_event.emoji
+       end
 ```
 
-Here's another trigger for determining when an reaction is added/removed:
+The bot must get into an event loop for processing. The `run` function can be used as such:
+
 ```julia
-struct ReactionTrigger <: AbstractTrigger
-    emoji_name::String
-    operation::OperationEnum  # Add or Remove
-end
+julia> play(bot)
 ```
 
-Putting it together, this is how DevX looks like:
-```julia
-# Create a new Bot.
-# 1. It needs a client object for handlers to make HTTP Discord requests
-# 2. It needs a way to communcate with the control plane
-bot = Bot(BotClient(), ZMQConnector(6000))
-
-# Add handlers
-prefix = ","
-add_handler!(bot, echo_handler, CommandTrigger(prefix, "echo"))
-
-# Infinite loop
-run_loop(bot)
-```
-
-And the handler:
-```julia
-function echo_handler(
-    # Allow the handler to interact with Discord e.g. sending a message
-    client::BotClient,
-
-    # The actual gateway event that happened
-    ev::Event,
-
-    # ---- after this point, arguments are customized by the Trigger ----
-
-    # channel
-    channel::DiscordChannel,
-
-    # message
-    message::Message,
-
-    # parsed contains "hello world" if the Discord user typed ",echo hello world"
-    # that's because CommandTrigger already parsed the command.
-    # theoretically, it could pass more arguments when subcommands are matched
-    parsed::String
-)
-    create_message(client, channel; content = "Got it: " * parsed)
-end
-```
