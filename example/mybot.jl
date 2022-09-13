@@ -2,12 +2,10 @@
 
 using Discorder
 
-# Start a new gateway
-tracker_ref = Ref{Discorder.GatewayTracker}()
-@async Discorder.run(; tracker_ref, config_file_path = "etc/dev.toml")
+port = 6000
 
-# Make sure that events are published
-Discorder.add_event_publisher(tracker_ref[], Discorder.ZMQPublisher(6000))
+# Start gateway server
+@async serve(config_file_path="etc/dev.toml", publisher=ZMQPublisher(port))
 
 # Create bot
 bot = SimpleBot()
@@ -16,13 +14,13 @@ bot = SimpleBot()
 register!(bot, CommandTrigger(',', r"echo ")) do client, message
     msg = strip(message.content[6:end])
     @info "message content = $msg"
-    create_message(client, message.channel_id; content = "$msg")
+    create_message(client, message.channel_id; content="$msg")
 end
 
 # Register reaction add handler
 register!(bot, ReactionAddTrigger()) do client, reaction_add_event
-    @info "reaction event " reaction_add_event.emoji
+    @info "reaction event " reaction_add_event.emoji.name
 end
 
 # Run bot event loop
-play(bot; port = 6000)
+start(bot, port)

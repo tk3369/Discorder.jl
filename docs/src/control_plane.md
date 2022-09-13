@@ -23,7 +23,7 @@ To run the control plane, make sure that the `DISCORD_BOT_TOKEN` environment var
 Then, simply invoke the following function:
 
 ```julia
-Discorder.run()
+serve()
 ```
 
 The function actually takes a couple of keyword parameters if you want more customization:
@@ -44,7 +44,7 @@ Base.RefValue{Discorder.GatewayTracker}(#undef)
 julia> client = D.BotClient()
 BotClient(<token>, Discorder.RateLimiter(Dict{String, Discorder.Bucket}(), Dict{String, String}(), Discorder.WAIT))
 
-julia> @async D.run(; client, tracker_ref, config_file_path = "etc/dev.toml")
+julia> @async D.serve(; client, tracker_ref, config_file_path = "etc/dev.toml")
 Task (runnable) @0x00000001092088b0
 ```
 

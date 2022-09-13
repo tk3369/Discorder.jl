@@ -116,7 +116,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    run(;
+    serve(;
         client::BotClient=BotClient(),
         tracker_ref=Ref{GatewayTracker}(),
         config_file_path::Optional{AbstractString}=nothing,
@@ -125,10 +125,11 @@ end
 Run control plane in a loop so that we can actually auto-recover when
 bad things happen.
 """
-function run(;
+function serve(;
     client::BotClient=BotClient(),
     tracker_ref=Ref{GatewayTracker}(),
     config_file_path::Optional{AbstractString}=nothing,
+    publisher::Optional{AbstractEventPublisher}=nothing,
 )
     if !isnothing(config_file_path)
         config = read_gateway_config(config_file_path)
@@ -142,12 +143,17 @@ function run(;
             @info "Starting a new control plane"
             elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
             @info "Started control plane" elapsed_seconds
+
+            !isnothing(publisher) && add_event_publisher(tracker_ref[], publisher)
+            @info "Added event publisher" publisher
+
             try
                 wait(tracker_ref[].master_task)
             catch ex
                 ex isa TaskFailedException && @error "Control plane failed" ex
             end
             @info "Control plane is finished"
+
             if tracker_ref[].terminate_flag
                 @info "Terminate flag is set to true, exiting control pane loop."
                 break

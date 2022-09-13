@@ -1,7 +1,5 @@
 using ZMQ: ZMQ
 
-export SimpleBot, CommandTrigger, ReactionAddTrigger, register!, play
-
 abstract type AbstractBot end
 
 struct SimpleBot <: AbstractBot
@@ -40,7 +38,7 @@ function register!(f::Function, bot::AbstractBot, trigger::AbstractTrigger)
     return push!(bot.handlers, Handler(trigger, f))
 end
 
-function play(bot::AbstractBot; port=6000)
+function start(bot::AbstractBot, port::Integer)
     socket = ZMQ.Socket(ZMQ.SUB)
     ZMQ.subscribe(socket, "")
     ZMQ.connect(socket, "tcp://localhost:$port")
