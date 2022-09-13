@@ -1,6 +1,6 @@
 # NOTE: Make sure that DISCORD_BOT_TOKEN is already set in the environment.
 
-using Discorder
+using Revise, Discorder
 
 port = 6000
 
@@ -11,7 +11,7 @@ port = 6000
 bot = SimpleBot()
 
 # Register ,echo command
-register!(bot, CommandTrigger(',', r"echo ")) do client, message
+register!(bot, CommandTrigger(r",echo ")) do client, message
     msg = strip(message.content[6:end])
     @info "message content = $msg"
     create_message(client, message.channel_id; content="$msg")

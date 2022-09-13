@@ -129,7 +129,7 @@ function serve(;
     client::BotClient=BotClient(),
     tracker_ref=Ref{GatewayTracker}(),
     config_file_path::Optional{AbstractString}=nothing,
-    publisher::Optional{AbstractEventPublisher}=nothing,
+    publisher::Optional{AbstractEventPublisher}=nothing
 )
     if !isnothing(config_file_path)
         config = read_gateway_config(config_file_path)
@@ -242,8 +242,8 @@ function send_identify_payload(tracker::GatewayTracker)
             intents=Int(0x01ffff),
             properties=IdentifyConnectionProperties(;
                 os_="linux", browser_="Discorder", device_="Discorder"
-            ),
-        ),
+            )
+        )
     )
     return send_payload(tracker, payload)
 end

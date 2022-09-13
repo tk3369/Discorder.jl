@@ -12,16 +12,13 @@ SimpleBot() = SimpleBot(BotClient(), Any[])
 abstract type AbstractTrigger end
 
 struct CommandTrigger <: AbstractTrigger
-    prefix::Char
-    regex::Regex  # matches starting 2nd character
+    regex::Regex
 end
 
 function should_trigger(t::CommandTrigger, ev::Event)
     if ev.type == "MESSAGE_CREATE"
         message = ev.data.content
-        first(message) == t.prefix || return false
-        rest = message[nextind(message, 1):end]
-        return !isnothing(match(t.regex, rest))
+        return !isnothing(match(t.regex, message))
     end
     return false
 end
