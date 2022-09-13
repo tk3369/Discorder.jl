@@ -56,7 +56,7 @@ Below is the current design.
 First, create an instance of a bot. This object is used to keep track of the bot client as well as registered handlers. By default, the bot listens to port 6000 for ZMQ events. See [control plane doc](control_plane.md) about how to publish events from the Gateway using ZMQ.
 
 ```julia
-bot = SimpleBot()
+bot = Bot()
 ```
 
 Registering a command handler involves a command prefix and a regex to recognize the command itself. There are always two arguments passed to the user function: 1) bot client 2) discord object for that event.

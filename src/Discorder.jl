@@ -3,11 +3,11 @@ module Discorder
 export BotClient, BearerClient
 
 # To operate gateway server
-export ZMQPublisher
+export ZMQPublisher, GatewayTracker
 export serve
 
 # To operate a bot
-export SimpleBot, CommandTrigger, ReactionAddTrigger, register!, start
+export Bot, BotExit, CommandTrigger, ReactionAddTrigger, register!, reset!, start
 
 using Base.Iterators: Pairs
 
