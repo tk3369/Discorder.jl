@@ -18,12 +18,20 @@ struct CommandTrigger <: AbstractTrigger
     regex::Regex
 end
 
+"""
+Return a vector of arguments that is passed to the user function
+when triggered, or `nothing` if the trigger should not be fired.
+"""
+function should_trigger end
+
 function should_trigger(t::CommandTrigger, ev::Event)
     if ev.type == "MESSAGE_CREATE"
         message = ev.data.content
-        return !isnothing(match(t.regex, message))
+        result = match(t.regex, message)
+        isnothing(result) && return nothing
+        return result.captures
     end
-    return false
+    return nothing
 end
 
 """
@@ -32,7 +40,13 @@ end
 A trigger that is fired when a reaction is added to a message.
 """
 struct ReactionAddTrigger <: AbstractTrigger end
-should_trigger(t::ReactionAddTrigger, ev::Event) = ev.type == "MESSAGE_REACTION_ADD"
+
+function should_trigger(t::ReactionAddTrigger, ev::Event)
+    if ev.type == "MESSAGE_REACTION_ADD"
+        return [ev.data.emoji.name]
+    end
+    return nothing
+end
 
 struct Bot
     client::BotClient
@@ -62,8 +76,9 @@ function start(bot::Bot, port::Integer)
         msg = String(ZMQ.recv(socket))
         event = parse(Event, msg)
         for (trigger, func) in bot.handlers
-            if should_trigger(trigger, event)
-                result = func(bot.client, event.data)
+            trigger_args = should_trigger(trigger, event)
+            if !isnothing(trigger_args)
+                result = func(bot.client, event.data, trigger_args...)
                 result == BotExit() && return
             end
         end

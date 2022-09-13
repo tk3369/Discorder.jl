@@ -12,18 +12,18 @@ server = @async serve(tracker_ref=gw, config_file_path="etc/dev.toml", publisher
 bot = Bot()
 
 # Register ,echo command
-register!(bot, CommandTrigger(r",echo ")) do client, message
-    msg = strip(message.content[6:end])
-    @info "message content = $msg"
-    create_message(client, message.channel_id; content="ok, you said: $msg")
+register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
+    @info "message content = $str"
+    create_message(client, message.channel_id; content="ok, you said: $str")
 end
 
 # Register reaction add handler
-register!(bot, ReactionAddTrigger()) do client, reaction_add_event
-    @info "reaction event " reaction_add_event.emoji.name
+register!(bot, ReactionAddTrigger()) do client, reaction_add_event, emoji_name
+    @info "reaction event " emoji_name
 end
 
 register!(bot, CommandTrigger(r",bye")) do client, message
+    create_message(client, message.channel_id; content="ok, bot is exiting...")
     return BotExit()
 end
 
