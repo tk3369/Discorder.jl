@@ -1,48 +1,55 @@
+# https://discord.com/developers/docs/resources/guild#guild-object-guild-structure
 @discord_object struct Guild
     id::Snowflake
     name::String
     icon::String
+    icon_hash::String
     splash::String
     discovery_splash::String
     owner::Bool
     owner_id::Snowflake
-    permissions::Int64
+    permissions::Permissions
     region::String
     afk_channel_id::Snowflake
     afk_timeout::Int
-    embed_enabled::Bool
-    embed_channel_id::Snowflake
-    verification_level::VerificationLevel.VerificationLevelEnum
-    default_message_notifications::MessageNotificationsLevel.MessageNotificationsLevelEnum
-    explicit_content_filter::ExplicitContentFilter.ExplicitContentFilterEnum
+    widget_enabled::Bool
+    widget_channel_id::Snowflake
+    verification_level::VerificationLevel.T
+    default_message_notifications::MessageNotificationsLevel.T
+    explicit_content_filter::ExplicitContentFilter.T
     roles::Vector{Role}
     emojis::Vector{Emoji}
     features::Vector{String}
-    mfa_level::MFALevel.MFALevelEnum
+    mfa_level::MFALevel.T
     application_id::Snowflake
-    widget_enabled::Bool
-    widget_channel_id::Snowflake
     system_channel_id::Snowflake
     system_channel_flags::Int
     rules_channel_id::Snowflake
-    joined_at::Union{String, DateTime}
+    joined_at::Timestamp
     large::Bool
     unavailable::Bool
     member_count::Int
     voice_states::Vector{VoiceState}
     members::Vector{GuildMember}
     channels::Vector{DiscordChannel}
-    presences::Vector{Presence}
+    threads::Vector{DiscordChannel}
+    presences::Vector{PresenceUpdateEvent}  # partial
     max_presences::Int
     max_members::Int
     vanity_url_code::String
     description::String
     banner::String
-    premium_tier::PremiumTier.PremiumTierEnum
+    premium_tier::PremiumTier.T
     premium_subscription_count::Int
     preferred_locale::String
     public_updates_channel_id::Snowflake
     max_video_channel_users::Int
     approximate_member_count::Int
     approximate_presence_count::Int
+    welcome_screen::WelcomeScreen
+    nsfw_level::GuildNSFWLevel.T
+    stage_instances::Vector{StageInstance}
+    stickers::Vector{Sticker}
+    guild_scheduled_events::Vector{GuildScheduledEvent}
+    premium_progress_bar_enabled::Bool
 end

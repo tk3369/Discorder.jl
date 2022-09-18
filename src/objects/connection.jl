@@ -1,3 +1,4 @@
+# https://discord.com/developers/docs/resources/user#connection-object
 @discord_object struct Connection
     id::String
     name::String
@@ -7,5 +8,5 @@
     verified::Bool
     friend_sync::Bool
     show_activity::Bool
-    visibility::ConnectionVisibility.ConnectionVisibilityEnum
+    visibility::ConnectionVisibility.T
 end
