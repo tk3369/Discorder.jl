@@ -25,7 +25,11 @@ end
 function Base.parse(::Type{Event}, json::AbstractString)
     parsed = JSON3.read(json)
     payload_type = get_event_object_mappings()[parsed.type]
-    return Event(parsed.type, parsed.data, parse_zoned_date_time(parsed.timestamp))
+    # TODO this part of constructing event object is hacky
+    event_str = JSON3.write(parsed.data)
+    event_obj = JSON3.read(event_str, payload_type)
+    zoned_dt = parse_zoned_date_time(parsed.timestamp)
+    return Event(parsed.type, event_obj, zoned_dt)
 end
 
 """
