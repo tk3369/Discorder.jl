@@ -2,3 +2,4 @@
 fail_on_error = false
 debug = true
 log_heartbeat = true
+log_file_path = "dev.log"

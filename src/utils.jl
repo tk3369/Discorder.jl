@@ -43,16 +43,18 @@ function show_error(ex::Exception)
 end
 
 """
-    get_logger(; debug, filename)
+    get_logger(filename; debug::Bool)
 
-Return a custom logger that write to the specified file. A timestamp is automatically
+Return a custom logger that write to the specified log file. A timestamp is automatically
 injected.
+
+# Arguments
+- `file_path`: path of log file
 
 # Keyword arguments
 - `debug`: turn on debug logging (default = `false`)
-- `filename`: name of log file (default = `"Discorder.log"`)
 """
-function get_logger(; debug=false, filename="Discorder.log")
+function get_logger(file_path; debug=false)
     function timestamp_logger(logger)
         TransformerLogger(logger) do log
             current_time = now(localzone())
@@ -61,7 +63,7 @@ function get_logger(; debug=false, filename="Discorder.log")
         end
     end
     level = debug ? Logging.Debug : Logging.Info
-    return timestamp_logger(MinLevelLogger(FileLogger(filename), level))
+    return timestamp_logger(MinLevelLogger(FileLogger(file_path), level))
 end
 
 """

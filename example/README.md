@@ -2,7 +2,7 @@
 
 First, make sure that `DISCORD_BOT_TOKEN` environment variable is set.
 
-Start the gateway server. The log file can be found in Discorder.log.
+Start the gateway server. The log file can be found in `dev.log`.
 ```
 julia --project=. example/server.jl
 ```

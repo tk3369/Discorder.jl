@@ -72,8 +72,9 @@ end
 function get_config(config::Optional{Dict}, key::AbstractString)
     # default config mimics production settings
     default_config = Dict(
-        "fail_on_error" => false,
         "debug" => false,
+        "fail_on_error" => false,
+        "log_file_path" => "Discorder.log",
         "log_heartbeat" => false,
         "throttle_seconds_between_restart" => 1,
     )
@@ -138,7 +139,8 @@ function serve(;
         config = nothing
         debug = false
     end
-    with_logger(get_logger(; debug)) do
+    log_file_path = get_config(config, "log_file_path")
+    with_logger(get_logger(log_file_path; debug)) do
         while true
             @info "Starting a new control plane"
             elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)

@@ -57,7 +57,7 @@ Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}())
 
 function register!(f::Function, bot::Bot, trigger::AbstractTrigger)
     bot.handlers[trigger] = f
-    @info "There are $(length(bot.handlers)) handlers"
+    @debug "There are $(length(bot.handlers)) handlers"
     return nothing
 end
 
@@ -68,10 +68,12 @@ end
 # Special token to exit bot when a handler returns the token
 struct BotExit end
 
-function start(bot::Bot, port::Integer)
+function start(bot::Bot, port::Integer, host="localhost")
+    connection_string = "tcp://$host:$port"
     socket = ZMQ.Socket(ZMQ.SUB)
     ZMQ.subscribe(socket, "")
-    ZMQ.connect(socket, "tcp://localhost:$port")
+    ZMQ.connect(socket, connection_string)
+    @info "Starting event loop, listening to $connection_string"
     while true
         msg = String(ZMQ.recv(socket))
         event = parse(Event, msg)

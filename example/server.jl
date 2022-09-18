@@ -10,8 +10,7 @@ task = @async serve(tracker_ref=gw, config_file_path=cfg, publisher=ZMQPublisher
 @info "Gateway server starting, please wait..."
 while true
     if isassigned(gw) && Discorder.is_operational(gw[])
-        log_file = gw[].config
-        @info "Gateway server started, see log file Discorder.log"
+        @info "Gateway server started" cfg port
         break
     end
     sleep(0.1)
