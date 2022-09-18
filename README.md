@@ -30,7 +30,7 @@ Here is the list of features:
 
 The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to events from Discord, for example, people sending messages or reacting to a message. It's primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane server is simple:
 
-```
+```julia
 port = 6000
 cfg = "etc/dev.toml"
 serve(config_file_path=cfg, publisher=ZMQPublisher(port))
