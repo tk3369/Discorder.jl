@@ -20,6 +20,8 @@ So the gateway process can run forever and each bot component can start/stop whe
 In addition, it opens up the opportunity if someone wants to run the gateway process only, and implement
 bot components using a different language/runtime.
 
+A demonstration of this idea can be found in the `example` folder.
+
 ## Declarative bot development
 
 Perhaps a bot can be defined as a bunch of functions in a module?
