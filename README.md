@@ -12,7 +12,8 @@ Previous attempts were great but had problem with runtime connection instabiliti
 1. Supports the latest version of the Discord API (version 10 as of June 2022).
 2. Have a solid control plane for the gateway interface, which is error-resilient and can auto-recover from connectivity problems.
 3. Ability to decouple user code from the control plane, so problems with user code do not necessarily affect the operation of control plane.
-4. Have a high-level API that makes it easy to develop and operate a Discord bot.
+4. Consistency with Discord API reference. For example, when you find [Create Message](https://discord.com/developers/docs/resources/channel#create-message) from the Discord API documentation, you can find the equivalent `create_message` function (lowercase, snake case).
+5. Have a high-level API that makes it easy to develop and operate a Discord bot.
 
 ## Current status
 
