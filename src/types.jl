@@ -19,16 +19,13 @@ Event(type::AbstractString, data::T=nothing) where {T} = Event(type, data, now(l
 Base.show(io::IO, e::Event) = print(io, string(e.timestamp), " ", e.type)
 
 function Base.string(event::Event)
-    json = JSON3.write(event.data)
-    # println("json=$json")
-    return join([event.type, string(event.timestamp), json], "\t")
+    return JSON3.write(event)
 end
 
-function Base.parse(::Type{Event}, s::AbstractString)
-    type, timestamp, json = split(s, "\t")
-    payload_type = get_event_object_mappings()[type]
-    data = JSON3.read(json, payload_type)
-    return Event(type, data, parse_zoned_date_time(timestamp))
+function Base.parse(::Type{Event}, json::AbstractString)
+    parsed = JSON3.read(json)
+    payload_type = get_event_object_mappings()[parsed.type]
+    return Event(parsed.type, parsed.data, parse_zoned_date_time(parsed.timestamp))
 end
 
 """
