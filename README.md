@@ -5,7 +5,7 @@
 
 Write [Discord](https://discord.com) bots in [Julia](https://julialang.org). This package is the most complete and up-to-date implementation of the Discord API for Julia.
 
-### Project goals
+## Project goals
 
 Previous attempts were great but had problem with runtime connection instabilities and difficulties in keeping up with Discord API changes. Learning from those experiences, the goals of this project includes:
 
@@ -14,7 +14,7 @@ Previous attempts were great but had problem with runtime connection instabiliti
 3. Ability to decouple user code from the control plane, so problems with user code do not necessarily affect the operation of control plane.
 4. Have a high-level API that makes it easy to develop and operate a Discord bot.
 
-### Current status
+## Current status
 
 Here is the list of features:
 - [x] Discord v10 API support (reconciled in June 2022)
@@ -26,7 +26,35 @@ Here is the list of features:
 - [ ] Audit log header (required for certain API calls since v10)
 - [ ] Slash commands
 
-### History
+## TL;DR - how to operate a Discord bot
+
+The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to events from Discord, for example, people sending messages or reacting to a message. It's primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane server is simple:
+
+```
+port = 6000
+cfg = "etc/dev.toml"
+serve(config_file_path=cfg, publisher=ZMQPublisher(port))
+```
+
+User code that runs bot custom logic can subscribe to the gateway events and register for specific patterns. For example, an "echo" bot can be written easily as such:
+
+```julia
+port = 6000
+bot = Bot()
+
+register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
+    create_message(client, message.channel_id;
+        content="ok, you said: $str",
+        message_reference=MessageReference(message_id=message.id)
+    )
+end
+
+start(bot, port)
+```
+
+See `example` folder for the complete code and more bot examples.
+
+## History
 
 [Xh4H](https://github.com/Xh4H) and [Chris de Graaf](https://github.com/christopher-dG) previously implemented the [Xh4H/Discord.jl package](https://github.com/Xh4H/Discord.jl), but it was never published in the Julia registry for several reasons.
 
