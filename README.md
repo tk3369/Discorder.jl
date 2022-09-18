@@ -21,7 +21,7 @@ Here is the list of features:
 - [x] Gateway connectivity and auto-recovery from connection problems
 - [x] System management via control plane
 - [x] Event publisher (local channel, file-based, and ZMQ pub/sub)
-- [o] High level command/handler API like those in Xh4H Discord.jl
+- [ ] High level command/handler API like those in Xh4H Discord.jl
 - [ ] Gateway resume (it currently opens a new connection during recovery)
 - [ ] Audit log header (required for certain API calls since v10)
 - [ ] Slash commands
