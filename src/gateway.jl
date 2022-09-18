@@ -440,7 +440,7 @@ function stop_control_plane(tracker::GatewayTracker, reason::String)
     return nothing
 end
 
-is_connected(tracker::GatewayTracker) = isopen(tracker.websocket)
+is_connected(tracker::GatewayTracker) = !isnothing(tracker.websocket) && isopen(tracker.websocket)
 
 is_task_runnable(t::Task) = istaskstarted(t) && !istaskdone(t)
 is_task_runnable(::Nothing) = false   # stopped tasks has `nothing` value
@@ -453,15 +453,12 @@ end
 
 function is_operational(tracker::GatewayTracker)
     if !is_connected(tracker)
-        @error "Websocket already closed"
         return false
     end
     if !is_task_runnable(tracker.heartbeat_task)
-        @error "Heartbeat task not running anymore"
         return false
     end
     if !is_task_runnable(tracker.processor_task)
-        @error "Processor task not running anymore"
         return false
     end
     return true
@@ -537,7 +534,7 @@ function get_event_object_mappings()
         "GUILD_BAN_ADD" => GuildBanAddEvent,
         "GUILD_BAN_REMOVE" => GuildBanRemoveEvent,
         "GUILD_EMOJIS_UPDATE" => GuildEmojisUpdateEvent,
-        "GUILD_STICKERS_UPDATE" => GuildStickersUpdateEvent,
+        "GUILD_STICKESR_UPDATE" => GuildStickersUpdateEvent,
 
         # https://discord.com/developers/docs/topics/gateway#guild-integrations-update
         "GUILD_INTEGRATIONS_UPDATE" => GuildIntegrationsUpdateEvent,
