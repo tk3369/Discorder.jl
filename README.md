@@ -63,4 +63,4 @@ Chris started a [new Discord.jl project](https://github.com/christopher-dG/Disco
 
 [@xxxAnn](https://github.com/xxxAnn) forked Xh4H's Discord.jl package late 2021 in an attempt to update the API to the latest version. The project is called [Ekztazy.jl](https://github.com/Humans-of-Julia/Ekztazy.jl).
 
-[Tom](https://github.com/tk3369) forked Chris' project in 2022 in the light of Discord's plan to decommision version 6 of their API. To avoid confusion to Xh4H and Chris' previous implementations, this package has been renamed to Discorder.jl.
+[Tom](https://github.com/tk3369) forked Chris' project in 2022 in the light of Discord's plan to decommision version 6 of their API. To avoid confusion to Xh4H and Chris' previous implementations, this package has been renamed to Discorder.jl. While this is a fork from Chris' Discord.jl package, there is no plan to upstream changes.
