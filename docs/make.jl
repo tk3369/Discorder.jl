@@ -8,13 +8,13 @@ makedocs(;
     sitename="Discorder.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        assets=String[],
+        assets=String[]
     ),
     pages=[
         "Home" => "index.md",
-    ],
+    ]
 )
 
 deploydocs(;
-    repo="github.com/tk3369/Discorder.jl",
+    repo="github.com/tk3369/Discorder.jl"
 )
