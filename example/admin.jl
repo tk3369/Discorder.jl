@@ -6,13 +6,14 @@ port = 6000
 
 bot = Bot()
 
-# Register ,echo command
-register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
-    @info "Echo handler" str
+# Returing `BotExit()` from a handler would exit out of the event loop
+# gracefully.
+register!(bot, CommandTrigger(r",bye")) do client, message
     create_message(client, message.channel_id;
-        content="ok, you said: $str",
+        content="ok, admin bot is exiting...",
         message_reference=MessageReference(message_id=message.id)
     )
+    return BotExit()
 end
 
 start(bot, port)
