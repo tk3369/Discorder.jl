@@ -43,7 +43,5 @@ abstract type AbstractEventPublisher end
     publish(publisher::AbstractEventPublisher, event::Event)
 
 Publish an event via the provided event publisher.
-
-See also: [ChannelEventPublisher](@ref), [ZMQEventPublisher](@ref)
 """
 function publish(publisher::AbstractEventPublisher, event::Event) end
