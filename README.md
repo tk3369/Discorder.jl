@@ -2,6 +2,8 @@
 
 [![HoJ Discord](https://img.shields.io/discord/762167454973296644?color=8af&label=HoJ%20Discord&style=flat-square)](https://discord.gg/mm2kYjB)
 ![Status](https://img.shields.io/badge/status-work%20in%20progress-yellow)
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://tk3369.github.io/Discorder.jl/dev/)
+
 
 Write [Discord](https://discord.com) bots in [Julia](https://julialang.org). This package is the most complete and up-to-date implementation of the Discord API for Julia.
 
