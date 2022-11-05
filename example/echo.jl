@@ -9,9 +9,11 @@ bot = Bot()
 # Register ,echo command
 register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
     @info "Echo handler" str
-    create_message(client, message.channel_id;
+    create_message(
+        client,
+        message.channel_id;
         content="ok, you said: $str",
-        message_reference=MessageReference(message_id=message.id)
+        message_reference=MessageReference(; message_id=message.id),
     )
 end
 

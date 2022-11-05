@@ -368,4 +368,3 @@ RESOURCE[] = "webhook"
 
 RESOURCE[] = "gateway"
 @route get_gateway GET "/gateway" Gateway
-

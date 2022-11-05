@@ -11,7 +11,7 @@ include_statements = filter(readlines("src/objects.jl")) do line
 end
 
 already_included_files = map(include_statements) do s
-    eval(Meta.parse(replace(s, r"include\((.*)\)" => s"\1") ))
+    eval(Meta.parse(replace(s, r"include\((.*)\)" => s"\1")))
 end
 
 sources = replace.(readdir("src/objects"; join=true), "src/" => "")

@@ -151,7 +151,7 @@ const client = D.BotClient()
             @test length(webhooks) == 1 && webhooks[1].id == webhook.id
             webhooks = D.get_guild_webhooks(client, guild)
             @test length(webhooks) == 1 && webhooks[1].id == webhook.id
-        @test D.modify_webhook(client, webhook; name="test2").name == "test2"
+            @test D.modify_webhook(client, webhook; name="test2").name == "test2"
             message = D.execute_webhook(client, webhook, webhook.token; content="hi")
             @test message.content == "hi"
             D.delete_webhook(client, webhook)

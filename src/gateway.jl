@@ -95,19 +95,6 @@ function get_config(config::Optional{Dict}, path::AbstractString)
     return node
 end
 
-# function get_gateway_config(config::Optional{Dict}, key::AbstractString)
-#     # default config mimics production settings
-#     default_config = Dict(
-#         "debug" => false,
-#         "fail_on_error" => false,
-#         "log_file_path" => "Discorder.log",
-#         "log_heartbeat" => false,
-#         "throttle_seconds_between_restart" => 1,
-#     )
-#     isnothing(config) && return default_config[key]
-#     return haskey(config, key) ? config[key] : default_config[key]
-# end
-
 function read_gateway_config(config_file_path::AbstractString)
     try
         return TOML.parse(String(read(config_file_path)))
@@ -495,7 +482,9 @@ function is_operational(tracker::GatewayTracker)
     return true
 end
 
-is_doctor_around(tracker::GatewayTracker) = is_task_runnable(tracker.doctor_task)
+function is_doctor_around(tracker::GatewayTracker)
+    return is_task_runnable(tracker.doctor_task)
+end
 
 task_state(task) = isnothing(task) ? nothing : task.state
 

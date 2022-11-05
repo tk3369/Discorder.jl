@@ -62,7 +62,7 @@ function register!(f::Function, bot::Bot, trigger::AbstractTrigger)
 end
 
 function reset!(bot::Bot)
-    empty!(bot.handlers)
+    return empty!(bot.handlers)
 end
 
 # Special token to exit bot when a handler returns the token
@@ -81,7 +81,7 @@ function start(bot::Bot, port::Integer, host="localhost")
             trigger_args = should_trigger(trigger, event)
             if !isnothing(trigger_args)
                 result = func(bot.client, event.data, trigger_args...)
-                result == BotExit() && return
+                result == BotExit() && return nothing
             end
         end
     end

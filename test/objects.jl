@@ -8,9 +8,9 @@ end
 T = getfield(D, name)
 @test fieldnames(T) == (:a, :b, :c)
 @test map(n -> fieldtype(T, n), fieldnames(T)) == (
-    Union{D.Snowflake, D.A.Null, Nothing, Missing},
-    Union{Int, D.A.Null, Nothing, Missing},
-    Union{String, D.A.Null, Nothing, Missing},
+    Union{D.Snowflake,D.A.Null,Nothing,Missing},
+    Union{Int,D.A.Null,Nothing,Missing},
+    Union{String,D.A.Null,Nothing,Missing},
 )
 
 x = T()

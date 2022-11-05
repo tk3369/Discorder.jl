@@ -8,9 +8,8 @@ using JSON3: JSON3
 using Discorder: Discorder
 const D = Discorder
 
-configure!(
-    path=joinpath(@__DIR__, "fixtures"),
-    ignore_headers=["Authorization", "User-Agent"],
+configure!(;
+    path=joinpath(@__DIR__, "fixtures"), ignore_headers=["Authorization", "User-Agent"]
 )
 
 @testset "Discorder.jl" begin

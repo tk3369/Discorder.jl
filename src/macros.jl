@@ -41,7 +41,8 @@ end
 
 macro discord_enum(name, block, kwargs...)
     if name isa Expr
-        name.head == :(::) || throw(ArgumentError("Bug: enum express must be like <name>::<type>"))
+        name.head == :(::) ||
+            throw(ArgumentError("Bug: enum express must be like <name>::<type>"))
         base_type = name.args[2]
         name = name.args[1]
     else
@@ -56,7 +57,9 @@ macro discord_enum(name, block, kwargs...)
         k, v = ex.args
         if v === true
             if k === :or
-                or = :(Base.:(|)(a::$(esc(enum_name)), b::$(esc(enum_name))) = Int(a) | Int(b))
+                or = :(function Base.:(|)(a::$(esc(enum_name)), b::$(esc(enum_name)))
+                    return Int(a) | Int(b)
+                end)
                 push!(extras.args, or)
             end
         end

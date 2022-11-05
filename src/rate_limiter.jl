@@ -13,8 +13,8 @@ mutable struct Bucket
 end
 
 struct RateLimiter
-    buckets::Dict{String, Bucket}
-    routes::Dict{String, String}
+    buckets::Dict{String,Bucket}
+    routes::Dict{String,String}
     handler::RateLimitHandler
 
     RateLimiter(handler=WAIT) = new(Dict(), Dict(), handler)
@@ -22,13 +22,14 @@ end
 
 struct RateLimitedError <: Exception
     reset::DateTime
-    response::Union{Response, Nothing}
+    response::Union{Response,Nothing}
 end
 
 RateLimitedError(reset) = RateLimitedError(reset, nothing)
 
-on_rate_limit(rl::RateLimiter, reset, resp=nothing) =
-    on_rate_limit(Val(rl.handler), reset, resp)
+function on_rate_limit(rl::RateLimiter, reset, resp=nothing)
+    return on_rate_limit(Val(rl.handler), reset, resp)
+end
 on_rate_limit(::Val{SENTINEL}, reset, resp) = RATE_LIMIT_SENTINEL
 on_rate_limit(::Val{THROW}, reset, resp) = throw(RateLimitedError(reset, resp))
 function on_rate_limit(::Val{WAIT}, reset, resp)
@@ -67,7 +68,7 @@ function apply_rate_limits!(rl, resp)
         GLOBAL_BUCKET
     else
         bucket_key = header(resp, "X-RateLimit-Bucket")
-        isempty(bucket_key) && return
+        isempty(bucket_key) && return nothing
         m = match(r"^/api/v\d/(?:channels|guilds|webhooks)/(\d+)", path)
         m === nothing ? bucket_key : "$bucket_key-$(m[1])"
     end
