@@ -7,9 +7,9 @@ Discorder.jl provides an easy way to write Discord bots in Julia.
 The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to events from Discord, for example, people sending messages or reacting to a message. It's primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane server is simple:
 
 ```julia
-port = 6000
-cfg = "etc/dev.toml"
-serve(config_file_path=cfg, publisher=ZMQPublisher(port))
+using Discorder
+
+serve(config_file_path="etc/dev.toml", publisher=ZMQPublisher(6000))
 ```
 
 ## Bot code
@@ -17,6 +17,8 @@ serve(config_file_path=cfg, publisher=ZMQPublisher(port))
 User code that runs bot custom logic can subscribe to the gateway events and register for specific patterns. For example, an "echo" bot can be written easily as such:
 
 ```julia
+using Discorder
+
 port = 6000
 bot = Bot()
 

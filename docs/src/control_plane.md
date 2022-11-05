@@ -93,41 +93,11 @@ Discorder.GatewayStats
 
 ## Adding publishers
 
-The control plane isn't very useful if it doesn't communicate whenever gateway events are received, right? There are several publisher implementations in this package. See the `publishers` directory. For demo purpose, let's add a ZMQ publisher:
-
-```julia
-julia> D.add_event_publisher(tracker_ref[], D.ZMQPublisher(6000))
-```
-
-Then, start a subscriber from the REPL:
-```julia
-julia> using Sockets, ZMQ
-
-julia> begin
-           socket = Socket(SUB)
-           subscribe(socket, "")
-           connect(socket, "tcp://localhost:6000")
-           while true
-               msg = ZMQ.recv(socket) |> String
-               @info "Received" msg
-           end
-       end
-```
-
-Now, go to Discord and enter a text message. I just entered "hello". The ZMQ subscriber should display the event received from the publisher.
-
-The wire format is just JSON and it contains the following top level fields:
-1. Event type e.g. `MESSAGE_CREATE`
-2. Timestamp e.g. `2022-09-11T16:17:41.535-07:00`
-3. Event payload
-
-## Other publishers
-
-For demo purpose, there are other publisher implementations:
+By default, the control plane works as a ZMQ publisher. It binds to a default port (6000). If additional event publishing is required then you can add new publishers manually. For demo purpose, there are a few publishers in the `src/publishers` directory:
 * `ChannelEventPublisher`: publish events to a `Channel`
 * `DelimitedFileEventPublisher`: publish events to a delimited file
 
-Publishers should generally "fire-and-forget". However, please beware that if you use `ChannelEventPublisher`, then there is a possibility that the channel is full and you are blocked due to "back-pressure". For production usage, you can consider using the ZMQ publisher or implementing your own non-blocking publisher.
+Publishers should generally "fire-and-forget". However, please beware that if you use `ChannelEventPublisher`, then there is a possibility that the channel is full and you are blocked due to "back-pressure". Keep that in mind for production usage as it could hang your control plane.
 
 ## Auto-recovery from task failures
 
@@ -138,9 +108,9 @@ julia> @async Base.throwto(tracker_ref[].processor_task, ErrorException("simulat
 Task (runnable) @0x000000016572a290
 ```
 
-In the log file, you will find that it has detected the failure and started a new control plane:
+In the log file, you will find that the control plane has detected the failure and restarted itself:
 ```
-┌ Info: Going to recover by starting a new control plane
+┌ Info: Starting a new control plane
 │   current_time = 2022-09-11T16:36:47.443-07:00
 └ @ Discorder /Users/tomkwong/.julia/dev/Discorder/src/gateway.jl:160
 ```

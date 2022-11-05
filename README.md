@@ -17,31 +17,20 @@ Previous attempts were great but had problem with runtime connection instabiliti
 4. Consistency with Discord API reference. For example, when you find [Create Message](https://discord.com/developers/docs/resources/channel#create-message) from the Discord API documentation, you can find the equivalent `create_message` function (lowercase, snake case).
 5. Have a high-level API that makes it easy to develop and operate a Discord bot.
 
-## Current status
-
-Here is the list of features:
-- [x] Discord v10 API support (reconciled in June 2022)
-- [x] Gateway connectivity and auto-recovery from connection problems
-- [x] System management via control plane
-- [x] Event publisher (local channel, file-based, and ZMQ pub/sub)
-- [ ] High level command/handler API like those in Xh4H Discord.jl
-- [ ] Gateway resume (it currently opens a new connection during recovery)
-- [ ] Audit log header (required for certain API calls since v10)
-- [ ] Slash commands
-
 ## TL;DR - how to operate a Discord bot
 
-The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to events from Discord, for example, people sending messages or reacting to a message. It's primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane server is simple:
+The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to all events from Discord, for example, people sending messages or reacting to a message. Its primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane is simple:
 
 ```julia
-port = 6000
-cfg = "etc/dev.toml"
-serve(config_file_path=cfg, publisher=ZMQPublisher(port))
+using Discorder
+serve(config_file_path="etc/dev.toml")
 ```
 
 User code that runs bot custom logic can subscribe to the gateway events and register for specific patterns. For example, an "echo" bot can be written easily as such:
 
 ```julia
+using Discorder
+
 port = 6000
 bot = Bot()
 
@@ -56,6 +45,19 @@ start(bot, port)
 ```
 
 See `example` folder for the complete code and more bot examples.
+
+## High level task list
+
+This project is still a work in progress. The followings are high level tasks:
+
+- [x] Discord v10 API support (reconciled in June 2022)
+- [x] Gateway connectivity and auto-recovery from connection problems
+- [x] System management via control plane
+- [x] Event publisher (local channel, file-based, and ZMQ pub/sub)
+- [ ] High level command/handler API like those in Xh4H Discord.jl
+- [ ] Gateway resume (it currently opens a new connection during recovery)
+- [ ] Audit log header (required for certain API calls since v10)
+- [ ] Slash commands
 
 ## History
 

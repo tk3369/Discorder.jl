@@ -1,3 +1,11 @@
+const DEFAULT_CONFIGS = Dict{String,Any}(
+    "main.debug" => false,
+    "main.fail_on_error" => false,
+    "main.log_file_path" => "Discorder.log",
+    "main.log_heartbeat" => false,
+    "main.throttle_seconds_between_restart" => 1,
+    "zmq.port" => 6000,
+)
 @with_kw mutable struct GatewayStats
     start_time::Optional{ZonedDateTime} = nothing
     ready_time::Optional{ZonedDateTime} = nothing
@@ -51,7 +59,7 @@ GatewayTracker is a stateful object used by the Control Pane.
     """
     Configuration settings. This is typically injected from reading a TOML file.
     """
-    config::Dict
+    config::Optional{Dict}
 
     """
     Some statistics related to the gateway process.
@@ -65,29 +73,44 @@ GatewayTracker is a stateful object used by the Control Pane.
 end
 
 function GatewayTracker(config::Optional{Dict})
-    fail_on_error = get_config(config, "fail_on_error")
+    fail_on_error = get_config(config, "main.fail_on_error")
     return GatewayTracker(; fail_on_error, config)
 end
 
-function get_config(config::Optional{Dict}, key::AbstractString)
-    # default config mimics production settings
-    default_config = Dict(
-        "debug" => false,
-        "fail_on_error" => false,
-        "log_file_path" => "Discorder.log",
-        "log_heartbeat" => false,
-        "throttle_seconds_between_restart" => 1,
-    )
-    isnothing(config) && return default_config[key]
-    return haskey(config, key) ? config[key] : default_config[key]
+maybe(x::Dict, key) = haskey(x, key) ? x[key] : nothing
+
+# Get a config setting. If the config setting isn't found from the config
+# dictionary then try to return a default setting, or `nothing` if no
+# default setting is available for that path.
+function get_config(config::Optional{Dict}, path::AbstractString)
+    path_keys = split(path, ".")
+    node = config  # start with top of tree
+    for key in path_keys
+        if !isnothing(node) && haskey(node, key)
+            node = node[key]
+        else
+            return maybe(DEFAULT_CONFIGS, path)
+        end
+    end
+    return node
 end
+
+# function get_gateway_config(config::Optional{Dict}, key::AbstractString)
+#     # default config mimics production settings
+#     default_config = Dict(
+#         "debug" => false,
+#         "fail_on_error" => false,
+#         "log_file_path" => "Discorder.log",
+#         "log_heartbeat" => false,
+#         "throttle_seconds_between_restart" => 1,
+#     )
+#     isnothing(config) && return default_config[key]
+#     return haskey(config, key) ? config[key] : default_config[key]
+# end
 
 function read_gateway_config(config_file_path::AbstractString)
     try
-        config = TOML.parse(String(read(config_file_path)))
-        gateway_config = config["gateway"]
-        # @info "Gateway config settings" gateway_config
-        return gateway_config
+        return TOML.parse(String(read(config_file_path)))
     catch ex
         @error "Unable to read gateway config" config_file_path ex
         error("Unable to read gateway config ($config_file_path): $ex")
@@ -130,24 +153,23 @@ function serve(;
     client::BotClient=BotClient(),
     tracker_ref=Ref{GatewayTracker}(),
     config_file_path::Optional{AbstractString}=nothing,
-    publisher::Optional{AbstractEventPublisher}=nothing
 )
+    config = nothing
     if !isnothing(config_file_path)
         config = read_gateway_config(config_file_path)
-        debug = get_config(config, "debug")
-    else
-        config = nothing
-        debug = false
     end
-    log_file_path = get_config(config, "log_file_path")
+    debug = get_config(config, "main.debug")
+    log_file_path = get_config(config, "main.log_file_path")
+    throttle_seconds = get_config(config, "main.throttle_seconds_between_restart")
+    zmq_port = get_config(config, "zmq.port")
+    @info "Starting gateway with settings" log_file_path throttle_seconds debug zmq_port
     with_logger(get_logger(log_file_path; debug)) do
         while true
             @info "Starting a new control plane"
             elapsed_seconds = @elapsed tracker_ref[] = start_control_plane(client, config)
             @info "Started control plane" elapsed_seconds
 
-            !isnothing(publisher) && add_event_publisher(tracker_ref[], publisher)
-            @info "Added event publisher" publisher
+            add_zmq_event_publisher!(tracker_ref[], zmq_port)
 
             try
                 wait(tracker_ref[].master_task)
@@ -156,6 +178,9 @@ function serve(;
             end
             @info "Control plane is finished"
 
+            # Master task has finished so this is the beginning of the shutdown process
+            abort_event_publishers!(tracker_ref[])
+
             if tracker_ref[].terminate_flag
                 @info "Terminate flag is set to true, exiting control pane loop."
                 break
@@ -163,12 +188,14 @@ function serve(;
                 @info "Fail on error flag is set to true, exiting control pane loop."
                 break
             end
-            @info "Sleeping betwwen restarts"
-            sleep(get_config(config, "throttle_seconds_between_restart"))
+
+            @info "Sleeping between restarts"
+            sleep(throttle_seconds)
             @info "Going to recover by starting a new control plane"
         end
         @info "Control plane has been shut down completely."
     end
+    return nothing
 end
 
 """
@@ -244,8 +271,8 @@ function send_identify_payload(tracker::GatewayTracker)
             intents=Int(0x01ffff),
             properties=IdentifyConnectionProperties(;
                 os_="linux", browser_="Discorder", device_="Discorder"
-            )
-        )
+            ),
+        ),
     )
     return send_payload(tracker, payload)
 end
@@ -299,7 +326,7 @@ function start_heartbeat(tracker::GatewayTracker)
             send_payload(tracker, payload)
             jitter = rand()  # should be between 0 and 1 per API Reference
             nap = tracker.heartbeat_interval_ms / 1000 * jitter
-            if get_config(tracker.config, "log_heartbeat")
+            if get_config(tracker.config, "main.log_heartbeat")
                 @info "Sent heartbeat, taking nap now." nap
             end
             tracker.stats.heartbeat_sent_count += 1
@@ -442,7 +469,9 @@ function stop_control_plane(tracker::GatewayTracker, reason::String)
     return nothing
 end
 
-is_connected(tracker::GatewayTracker) = !isnothing(tracker.websocket) && isopen(tracker.websocket)
+function is_connected(tracker::GatewayTracker)
+    return !isnothing(tracker.websocket) && isopen(tracker.websocket)
+end
 
 is_task_runnable(t::Task) = istaskstarted(t) && !istaskdone(t)
 is_task_runnable(::Nothing) = false   # stopped tasks has `nothing` value
@@ -601,12 +630,27 @@ function create_event(
     return Event(event_type, object)
 end
 
-function add_event_publisher(tracker::GatewayTracker, publisher::AbstractEventPublisher)
+function add_zmq_event_publisher!(tracker::GatewayTracker, port::Integer)
+    @info "Creating ZMQ publisher and binding to port $port"
+    publisher = ZMQPublisher(port)
+    add_event_publisher!(tracker, publisher)
+    return nothing
+end
+
+function add_event_publisher!(tracker::GatewayTracker, publisher::AbstractEventPublisher)
     if publisher in tracker.publishers
         @error "Cannot add duplicate event publisher" publisher
         return nothing
     end
     push!(tracker.publishers, publisher)
+    return nothing
+end
+
+function abort_event_publishers!(tracker::GatewayTracker)
+    for publisher in tracker.publishers
+        abort!(publisher)
+    end
+    empty!(tracker.publishers)
     return nothing
 end
 

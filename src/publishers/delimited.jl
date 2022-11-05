@@ -17,3 +17,13 @@ function publish(publisher::DelimitedFileEventPublisher, event::Event)
     @debug "Published file event" event.type event.timestamp
     return nothing
 end
+
+function abort!(publisher::DelimitedFileEventPublisher)
+    try
+        @info "Closing IOStream" publisher.io
+        close(publisher.io)
+    catch ex
+        @warn "Unable to close IOStream" publisher.io
+    end
+    return nothing
+end

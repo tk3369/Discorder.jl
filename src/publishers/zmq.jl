@@ -16,3 +16,12 @@ function publish(publisher::ZMQPublisher, event::Event)
     return nothing
 end
 
+function abort!(publisher::ZMQPublisher)
+    try
+        @info "Closing socket" publisher.socket
+        close(publisher.socket)
+    catch ex
+        @warn "Unable to close socket" publisher.socket
+    end
+    return nothing
+end

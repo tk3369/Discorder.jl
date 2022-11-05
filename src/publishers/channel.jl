@@ -13,3 +13,12 @@ function publish(publisher::ChannelEventPublisher, event::Event)
     return nothing
 end
 
+function abort!(publisher::ChannelEventPublisher)
+    try
+        @info "Closing channel" publisher.channel
+        close(publisher.channel)
+    catch ex
+        @warn "Unable to close channel" publisher.channel
+    end
+    return nothing
+end
