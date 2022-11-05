@@ -1,11 +1,10 @@
 # NOTE: Make sure that DISCORD_BOT_TOKEN is already set in the environment.
 using Discorder
 
-port = 6000
 cfg = "etc/dev.toml"
 
 gw = Ref{GatewayTracker}()
-task = @async serve(tracker_ref=gw, config_file_path=cfg, publisher=ZMQPublisher(port))
+task = @async serve(tracker_ref=gw, config_file_path=cfg)
 
 @info "Gateway server starting, please wait..."
 while true
