@@ -51,7 +51,7 @@ end
 struct Bot
     client::BotClient
     command_handlers::Dict{AbstractTrigger,Function}
-    error_handler::RefValue{Function}
+    error_handler::Base.RefValue{<:Function}
 end
 
 function default_error_handler(client, message, ex, args...)
