@@ -7,7 +7,8 @@ export ZMQPublisher, GatewayTracker
 export serve
 
 # To operate a bot
-export Bot, BotExit, CommandTrigger, ReactionAddTrigger, register!, reset!, start
+export Bot,
+    BotExit, CommandTrigger, ReactionAddTrigger, register_command_handler!, reset!, start
 
 using Base.Iterators: Pairs
 

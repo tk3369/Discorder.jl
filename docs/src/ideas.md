@@ -30,7 +30,7 @@ can be used to register functions.
 
 Currently, you must register handlers like this:
 ```julia
-register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
+register_command_handler!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
     @info "Echo handler" str
     create_message(client, message.channel_id;
         content="ok, you said: $str",

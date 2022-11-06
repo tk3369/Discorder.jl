@@ -34,7 +34,7 @@ using Discorder
 port = 6000
 bot = Bot()
 
-register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
+register_command_handler!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
     create_message(client, message.channel_id;
         content="ok, you said: $str",
         message_reference=MessageReference(message_id=message.id)

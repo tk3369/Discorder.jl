@@ -7,7 +7,7 @@ port = 6000
 bot = Bot()
 
 # Register ,echo command
-register!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
+register_command_handler!(bot, CommandTrigger(r",echo (.*)")) do client, message, str
     @info "Echo handler" str
     create_message(
         client,

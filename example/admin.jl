@@ -8,7 +8,7 @@ bot = Bot()
 
 # Returing `BotExit()` from a handler would exit out of the event loop
 # gracefully.
-register!(bot, CommandTrigger(r",bye")) do client, message
+register_command_handler!(bot, CommandTrigger(r",bye")) do client, message
     create_message(
         client,
         message.channel_id;

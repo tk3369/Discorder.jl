@@ -62,7 +62,7 @@ bot = Bot()
 Registering a command handler involves a command prefix and a regex to recognize the command itself. There are always two arguments passed to the user function: 1) bot client 2) discord object for that event.
 
 ```julia
-julia> register!(bot, CommandTrigger(',', r"echo ")) do client, message
+julia> register_command_handler!(bot, CommandTrigger(',', r"echo ")) do client, message
            msg = strip(message.content[6:end])
            @info "message content = $msg"
            create_message(client, message.channel_id; content = "$msg")
@@ -72,7 +72,7 @@ julia> register!(bot, CommandTrigger(',', r"echo ")) do client, message
 For illustration purpose, here's how to register a reaction handler, which would be called whenever a reaction add event is triggered.
 
 ```julia
-julia> register!(bot, ReactionAddTrigger()) do client, reaction_add_event
+julia> register_command_handler!(bot, ReactionAddTrigger()) do client, reaction_add_event
            @info "reaction event " reaction_add_event.emoji
        end
 ```

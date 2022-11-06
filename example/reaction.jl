@@ -6,7 +6,9 @@ port = 6000
 
 bot = Bot()
 
-register!(bot, ReactionAddTrigger()) do client, reaction_add_event, emoji_name
+register_command_handler!(
+    bot, ReactionAddTrigger()
+) do client, reaction_add_event, emoji_name
     @info "reaction event " emoji_name
 end
 

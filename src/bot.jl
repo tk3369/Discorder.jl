@@ -50,19 +50,31 @@ end
 
 struct Bot
     client::BotClient
-    handlers::Dict{AbstractTrigger,Function}
+    command_handlers::Dict{AbstractTrigger,Function}
+    error_handler::Function
 end
 
-Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}())
+function default_error_handler(ex)
+    @error "Raised exception" ex
+    return nothing
+end
 
-function register!(f::Function, bot::Bot, trigger::AbstractTrigger)
-    bot.handlers[trigger] = f
-    @debug "There are $(length(bot.handlers)) handlers"
+Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}(), default_error_handler)
+
+function register_command_handler!(f::Function, bot::Bot, trigger::AbstractTrigger)
+    bot.command_handlers[trigger] = f
+    @debug "There are $(length(bot.command_handlers)) command handlers"
+    return nothing
+end
+
+function register_error_handler!(f::Function, bot::Bot)
+    bot.error_handler = f
     return nothing
 end
 
 function reset!(bot::Bot)
-    return empty!(bot.handlers)
+    empty!(bot.command_handlers)
+    bot.error_handler = return nothing
 end
 
 # Special token to exit bot when a handler returns the token
@@ -77,11 +89,19 @@ function start(bot::Bot, port::Integer, host="localhost")
     while true
         msg = String(ZMQ.recv(socket))
         event = parse(Event, msg)
-        for (trigger, func) in bot.handlers
+        for (trigger, func) in bot.command_handlers
             trigger_args = should_trigger(trigger, event)
             if !isnothing(trigger_args)
-                result = func(bot.client, event.data, trigger_args...)
-                result == BotExit() && return nothing
+                try
+                    result = func(bot.client, event.data, trigger_args...)
+                    result == BotExit() && return nothing
+                catch ex
+                    try
+                        bot.error_handler(ex)
+                    catch err_ex
+                        @error "Error handler raised an exception itself" err_ex
+                    end
+                end
             end
         end
     end
