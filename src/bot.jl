@@ -48,10 +48,10 @@ function should_trigger(t::ReactionAddTrigger, ev::Event)
     return nothing
 end
 
-struct Bot
+mutable struct Bot
     client::BotClient
     command_handlers::Dict{AbstractTrigger,Function}
-    error_handler::Base.RefValue{<:Function}
+    error_handler::Function
 end
 
 function default_error_handler(client, message, ex, args...)
@@ -59,7 +59,7 @@ function default_error_handler(client, message, ex, args...)
     return nothing
 end
 
-Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}(), Ref(default_error_handler))
+Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}(), default_error_handler)
 
 function register_command_handler!(f::Function, bot::Bot, trigger::AbstractTrigger)
     bot.command_handlers[trigger] = f
@@ -68,13 +68,14 @@ function register_command_handler!(f::Function, bot::Bot, trigger::AbstractTrigg
 end
 
 function register_error_handler!(f::Function, bot::Bot)
-    bot.error_handler[] = f
+    bot.error_handler = f
     return nothing
 end
 
 function reset!(bot::Bot)
     empty!(bot.command_handlers)
-    bot.error_handler = return nothing
+    bot.error_handler = default_error_handler
+    return nothing
 end
 
 # Special token to exit bot when a handler returns the token
@@ -97,7 +98,7 @@ function start(bot::Bot, port::Integer, host="localhost")
                     result == BotExit() && return nothing
                 catch ex
                     try
-                        bot.error_handler[](bot.client, event.data, ex, trigger_args...)
+                        bot.error_handler(bot.client, event.data, ex, trigger_args...)
                     catch err_ex
                         @error "Error handler raised an exception itself" err_ex
                     end
