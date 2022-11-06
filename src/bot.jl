@@ -68,7 +68,7 @@ function register_command_handler!(f::Function, bot::Bot, trigger::AbstractTrigg
 end
 
 function register_error_handler!(f::Function, bot::Bot)
-    bot.error_handler = f
+    bot.error_handler[] = f
     return nothing
 end
 
