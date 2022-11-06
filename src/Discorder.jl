@@ -14,7 +14,8 @@ export Bot,
     register_command_handler!,
     register_error_handler!,
     reset!,
-    start
+    start,
+    Snowflake
 
 using Base.Iterators: Pairs
 
