@@ -51,7 +51,7 @@ end
 struct Bot
     client::BotClient
     command_handlers::Dict{AbstractTrigger,Function}
-    error_handler::Function
+    error_handler::RefValue{Function}
 end
 
 function default_error_handler(client, message, ex, args...)
@@ -59,7 +59,7 @@ function default_error_handler(client, message, ex, args...)
     return nothing
 end
 
-Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}(), default_error_handler)
+Bot() = Bot(BotClient(), Dict{AbstractTrigger,Function}(), Ref(default_error_handler))
 
 function register_command_handler!(f::Function, bot::Bot, trigger::AbstractTrigger)
     bot.command_handlers[trigger] = f
@@ -97,7 +97,7 @@ function start(bot::Bot, port::Integer, host="localhost")
                     result == BotExit() && return nothing
                 catch ex
                     try
-                        bot.error_handler(bot.client, event.data, ex, trigger_args...)
+                        bot.error_handler[](bot.client, event.data, ex, trigger_args...)
                     catch err_ex
                         @error "Error handler raised an exception itself" err_ex
                     end

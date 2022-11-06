@@ -8,7 +8,13 @@ export serve
 
 # To operate a bot
 export Bot,
-    BotExit, CommandTrigger, ReactionAddTrigger, register_command_handler!, reset!, start
+    BotExit,
+    CommandTrigger,
+    ReactionAddTrigger,
+    register_command_handler!,
+    register_error_handler!,
+    reset!,
+    start
 
 using Base.Iterators: Pairs
 
