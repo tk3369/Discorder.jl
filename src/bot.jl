@@ -54,7 +54,7 @@ struct Bot
     error_handler::Function
 end
 
-function default_error_handler(ex)
+function default_error_handler(client, message, ex, args...)
     @error "Raised exception" ex
     return nothing
 end
@@ -97,7 +97,7 @@ function start(bot::Bot, port::Integer, host="localhost")
                     result == BotExit() && return nothing
                 catch ex
                     try
-                        bot.error_handler(ex)
+                        bot.error_handler(bot.client, event.data, ex, trigger_args...)
                     catch err_ex
                         @error "Error handler raised an exception itself" err_ex
                     end
