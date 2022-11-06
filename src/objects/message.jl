@@ -16,7 +16,7 @@
     attachments::Vector{Attachment}
     embeds::Vector{Embed}
     reactions::Vector{Reaction}
-    nonce::Union{Int, String}
+    nonce::Union{Int,String}
     pinned::Bool
     webhook_id::Snowflake
     type::MessageType.T
@@ -25,7 +25,7 @@
     application_id::Snowflake
     message_reference::MessageReference
     message_flags::Int
-    flgas::Int
+    flags::Int
     # referenced_message    # currently not supported due to self-referencing structure
     interaction::MessageInteraction
     thread::DiscordChannel
