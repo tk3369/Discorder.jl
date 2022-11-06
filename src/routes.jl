@@ -19,18 +19,14 @@ function api_call(c, method, path, Into=Nothing, params=Dict(); kwargs...)
     ]
 
     body, query = if method in (:PATCH, :POST, :PUT)
-        if haskey(kwargs, :file)
+        if haskey(kwargs, :files)
             kw_dict = Dict(kwargs)
-            file = pop!(kw_dict, :file)
-            # This is just a hack to allow for easier testing. No user should use this.
-            boundary = NamedTuple()
-            if haskey(kw_dict, :__boundary__)
-                boundary = (; boundary=pop!(kw_dict, :__boundary__))
+            files = pop!(kw_dict, :files)
+            form_dict = Dict{String,Any}("payload_json" => JSON3.write(kw_dict))
+            for (idx, file) in enumerate(files)
+                push!(form_dict, "files[$idx]" => open(file))
             end
-            form = Form(
-                Dict(:file => file, :payload_json => JSON3.write(kw_dict)); boundary...
-            )
-            form, params
+            Form(form_dict), params
         else
             push!(headers, "Content-Type" => "application/json")
             JSON3.write(kwargs), params
