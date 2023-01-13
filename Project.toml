@@ -18,7 +18,7 @@ ZMQ = "c2297ded-f4af-51ae-bb23-16f91089e4e1"
 
 [compat]
 EnumX = "1"
-HTTP = "0.9"
+HTTP = "0.9, 1"
 JSON3 = "1"
 LoggingExtras = "0.4"
 Parameters = "0.12"
