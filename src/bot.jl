@@ -89,11 +89,14 @@ function start(bot::Bot, port::Integer, host="localhost")
     @info "Starting event loop, listening to $connection_string"
     while true
         msg = String(ZMQ.recv(socket))
+        @debug "Received: $msg"
         event = parse(Event, msg)
+        triggered = false
         for (trigger, func) in bot.command_handlers
             trigger_args = should_trigger(trigger, event)
             if !isnothing(trigger_args)
                 try
+                    triggered = true
                     result = func(bot.client, event.data, trigger_args...)
                     result == BotExit() && return nothing
                 catch ex
@@ -105,5 +108,6 @@ function start(bot::Bot, port::Integer, host="localhost")
                 end
             end
         end
+        @debug "Result" triggered
     end
 end
