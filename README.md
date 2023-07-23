@@ -5,28 +5,26 @@
 [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://tk3369.github.io/Discorder.jl/dev/)
 
 
-Write [Discord](https://discord.com) bots in [Julia](https://julialang.org). This package is the most complete and up-to-date implementation of the Discord API for Julia.
+Write [Discord](https://discord.com) bots in [Julia](https://julialang.org). This package is currently the most complete and up-to-date implementation of the Discord API for Julia.
 
-## Project goals
+## Architecture
 
-Previous attempts were great but had problem with runtime connection instabilities and difficulties in keeping up with Discord API changes. Learning from those experiences, the goals of this project includes:
+The primary difference between this and other Julia Discord libraries is that it has a separate control plane that primarily works with [Discord Gateway](https://discord.com/developers/docs/topics/gateway). This control plane continuously monitor activities from your Discord server and publish events.
 
-1. Supports the latest version of the Discord API (version 10 as of June 2022).
-2. Have a solid control plane for the gateway interface, which is error-resilient and can auto-recover from connectivity problems.
-3. Ability to decouple user code from the control plane, so problems with user code do not necessarily affect the operation of control plane.
-4. Consistency with Discord API reference. For example, when you find [Create Message](https://discord.com/developers/docs/resources/channel#create-message) from the Discord API documentation, you can find the equivalent `create_message` function (lowercase, snake case).
-5. Have a high-level API that makes it easy to develop and operate a Discord bot.
+Discord bots run as separate processes. You may operate multiple bots independently of each other. They all share the same events stream from the control plane.
 
-## TL;DR - how to operate a Discord bot
+![Architecture Diagram](docs/src/images/architecture.png)
 
-The control plane (which implements Discord Gateway interface) runs as an standalone process. It maintains a live connection to Discord and keeps a heartbeat process. It listens to all events from Discord, for example, people sending messages or reacting to a message. Its primary duty is to publish these events to a ZMQ pub/sub channel. Starting the control plane is simple:
+## Quick start
+
+Starting the control requires a simple config file. You can find examples configs in the [etc folder of this repo](etc).
 
 ```julia
 using Discorder
 serve(config_file_path="etc/dev.toml")
 ```
 
-User code that runs bot custom logic can subscribe to the gateway events and register for specific patterns. For example, an "echo" bot can be written easily as such:
+Bot clients can subscribe to the events and register for specific event patterns. For example, an "echo" bot can be written easily as such:
 
 ```julia
 using Discorder
@@ -44,9 +42,19 @@ end
 start(bot, port)
 ```
 
-See `example` folder for the complete code and more bot examples.
+See `example` folder for more bot examples.
 
-## High level task list
+## Project goals
+
+Previous attempts were great but had problem with runtime connection instabilities and difficulties in keeping up with Discord API changes. Learning from those experiences, the goals of this project includes:
+
+1. Ability to update to the latest Discord API easily
+2. Have a solid control plane for the gateway interface that is error-resilient and can auto-recover from connectivity problems.
+3. Ability to decouple user code from the control plane, so problems with user code do not necessarily affect the operation of control plane.
+4. Consistency with Discord API reference. For example, when you find [Create Message](https://discord.com/developers/docs/resources/channel#create-message) from the Discord API documentation, you can find the equivalent `create_message` function (lowercase, snake case).
+5. High-level API that makes it easy to develop and operate a Discord bot.
+
+## Features
 
 This project is still a work in progress. The followings are high level tasks:
 
