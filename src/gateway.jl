@@ -202,7 +202,7 @@ function start_control_plane(client::BotClient, config)
 
             # https://discord.com/developers/docs/topics/gateway#connecting
             # Once connected, the client should immediately receive an Opcode 10 Hello payload
-            json = String(readavailable(websocket))
+            json = String(HTTP.WebSockets.receive(websocket))
             @debug "Received first gateway message" json
             isempty(json) && throw(GatewayError("No data was received"))
 
@@ -288,7 +288,7 @@ function send_payload(tracker::GatewayTracker, payload::GatewayPayload)
     try
         str = json(payload)
         @debug "Sending payload" sanitize(str)
-        write(tracker.websocket, str)
+        HTTP.WebSockets.send(tracker.websocket, str)
         @debug "Finished sending payload"
     catch ex
         @error "Unable to send gateway payload: $ex"
@@ -351,8 +351,8 @@ end
 function start_processor(tracker::GatewayTracker)
     tracker.processor_task = @async try
         while true
-            if isopen(tracker.websocket)
-                json = String(readavailable(tracker.websocket))
+            if isopen(tracker.websocket.io)
+                json = String(HTTP.WebSockets.receive(tracker.websocket))
                 @debug "Received event" json
                 if !isempty(json)
                     payload = safe_parse_json(tracker, json, GatewayPayload)
@@ -457,7 +457,7 @@ function stop_control_plane(tracker::GatewayTracker, reason::String)
 end
 
 function is_connected(tracker::GatewayTracker)
-    return !isnothing(tracker.websocket) && isopen(tracker.websocket)
+    return !isnothing(tracker.websocket) && isopen(tracker.websocket.io)
 end
 
 is_task_runnable(t::Task) = istaskstarted(t) && !istaskdone(t)
