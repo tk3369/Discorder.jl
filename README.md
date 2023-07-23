@@ -15,7 +15,7 @@ Discord bots run as separate processes. You may operate multiple bots independen
 
 ![Architecture Diagram](docs/src/images/architecture.png)
 
-Source is located in [this Excalidraw session](https://excalidraw.com/#room=45e639e3e7fb06af6b02,c6wet5ynRlgGmOx2zVvxtg).
+Source is located in [Excalidraw](https://excalidraw.com/#json=6qjuNGHAiq_8s9QZC0yYN,BWOwo-Y4aIQEK5rApC3z0A).
 
 ## Quick start
 
