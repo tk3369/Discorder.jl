@@ -174,16 +174,14 @@ const client = D.BotClient()
 end
 
 @testset "Sending files" begin
-    playback("files.bson") do
+    if !replay # BrokenRecord does not work for this test
         guild = D.create_guild(client; name="MyGuild")
         try
             channel = D.create_guild_channel(client, guild; name="test")
             msg = mktempdir() do dir
                 file = joinpath(dir, "foo.json")
                 write(file, "{}")
-                open(file) do f
-                    D.create_message(client, channel; file=f, __boundary__="abcdef")
-                end
+                D.create_message(client, channel; files=[file])
             end
             attachments = msg.attachments
             @test length(attachments) == 1

@@ -51,7 +51,7 @@ function api_call(c, method, path, Into=Nothing, params=Dict(); kwargs...)
     if 200 <= resp.status < 300
         return parse_response(resp, Into)
     else
-        throw(StatusError(resp.status, resp))
+        throw(StatusError(resp.status, String(method), url, resp))
     end
 end
 
