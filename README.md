@@ -15,6 +15,8 @@ Discord bots run as separate processes. You may operate multiple bots independen
 
 ![Architecture Diagram](docs/src/images/architecture.png)
 
+Source is located in [this Excalidraw session](https://excalidraw.com/#room=45e639e3e7fb06af6b02,c6wet5ynRlgGmOx2zVvxtg).
+
 ## Quick start
 
 Starting the control requires a simple config file. You can find examples configs in the [etc folder of this repo](etc).
