@@ -371,7 +371,6 @@ function start_processor(tracker::GatewayTracker)
                     elseif payload.op === GatewayOpcode.Reconnect
                         # https://discord.com/developers/docs/topics/gateway#reconnect
                         event = Event("RECONNECT")
-                        publish_event(tracker, event)
                         stop_control_plane(tracker, "Discord wants me to reconnect")
                     elseif payload.op === GatewayOpcode.InvalidSession
                         # https://discord.com/developers/docs/topics/gateway#invalid-session
