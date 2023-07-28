@@ -90,24 +90,28 @@ function start(bot::Bot, port::Integer, host="localhost")
     while true
         msg = String(ZMQ.recv(socket))
         @debug "Received: $msg"
-        event = parse(Event, msg)
-        triggered = false
-        for (trigger, func) in bot.command_handlers
-            trigger_args = should_trigger(trigger, event)
-            if !isnothing(trigger_args)
-                try
-                    triggered = true
-                    result = func(bot.client, event.data, trigger_args...)
-                    result == BotExit() && return nothing
-                catch ex
+        try
+            event = parse(Event, msg)
+            triggered = false
+            for (trigger, func) in bot.command_handlers
+                trigger_args = should_trigger(trigger, event)
+                if !isnothing(trigger_args)
                     try
-                        bot.error_handler(bot.client, event.data, ex, trigger_args...)
-                    catch err_ex
-                        @error "Error handler raised an exception itself" err_ex
+                        triggered = true
+                        result = func(bot.client, event.data, trigger_args...)
+                        result == BotExit() && return nothing
+                    catch ex
+                        try
+                            bot.error_handler(bot.client, event.data, ex, trigger_args...)
+                        catch err_ex
+                            @error "Error handler raised an exception itself" err_ex
+                        end
                     end
                 end
             end
+            @debug "Result" triggered
+        catch ex
+            @warn "Unable to process message" ex msg
         end
-        @debug "Result" triggered
     end
 end
