@@ -317,6 +317,7 @@ function start_heartbeat(tracker::GatewayTracker)
                 @info "Sent heartbeat, taking nap now." nap
             end
             tracker.stats.heartbeat_sent_count += 1
+            GC.gc(true) # take the chance to gc
             sleep(nap)
         end
         @debug "Finished heartbeat task"
