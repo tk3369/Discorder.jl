@@ -92,11 +92,13 @@ function start(bot::Bot, port::Integer, host="localhost")
         @debug "Received: $msg"
         try
             event = parse(Event, msg)
+            triggered = false
             for (trigger, func) in bot.command_handlers
                 trigger_args = should_trigger(trigger, event)
                 if !isnothing(trigger_args)
+                    triggered = true
                     try
-                        @debug "Triggered command"
+                        @debug "Triggering command"
                         result = func(bot.client, event.data, trigger_args...)
                         result == BotExit() && return nothing
                     catch ex
@@ -107,6 +109,9 @@ function start(bot::Bot, port::Integer, host="localhost")
                         end
                     end
                 end
+            end
+            if !triggered
+                @debug "No command was triggered"
             end
         catch ex
             @warn "Unable to process message" ex msg
