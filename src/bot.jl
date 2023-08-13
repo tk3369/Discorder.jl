@@ -103,7 +103,10 @@ function start(bot::Bot, port::Integer, host="localhost")
                         result == BotExit() && return nothing
                     catch ex
                         try
-                            bot.error_handler(bot.client, event.data, ex, trigger_args...)
+                            st = stacktrace(catch_backtrace())
+                            bot.error_handler(
+                                bot.client, event.data, ex, st, trigger_args...
+                            )
                         catch err_ex
                             @error "Error handler raised an exception itself" err_ex
                         end
