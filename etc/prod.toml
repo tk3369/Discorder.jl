@@ -3,3 +3,6 @@ fail_on_error = false
 debug = false
 log_heartbeat = false
 log_file_path = "prod.log"
+
+[zmq]
+port = 6000
